@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trace Timeline Visualization</title>
+  
+  <!-- Include vis-timeline library -->
+  <script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/vis-timeline/styles/vis-timeline-graph2d.min.css">
+
+
+  <script type="module" src="js/main.js"></script>
+
+
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/buttons.css">
+  <link rel="stylesheet" href="css/vis-custom.css">
+  <link rel="stylesheet" href="css/timeline-section.css">
+  <link rel="stylesheet" href="css/details-section.css">
+</head>
+
+<body>
+  <!-- Page Header -->
+  <div class="details-header">
+    <div class="title">
+      <img src="assets/images/ratel_logo.png" alt="Logo" class="ratel-logo">
+      <h1>RATELProf Timeline Visualization</h1> 
+    </div>
+    <div id="json-buttons">
+      <button id="loadFileButton" aria-label="Load JSON File">Load JSON File</button>
+      <input type="file" id="fileInput" accept=".json" style="display:none;">
+    </div>
+</div>
+  
+
+  <main>
+    <!-- Timeline Container -->
+    <section id="timeline-container">
+      <div id="timeline" role="region" aria-label="Trace timeline"></div>
+    </section>
+
+    <!-- Navigation Section -->
+    <section id="navigation">
+      <div class="menu">
+        <button id="moveLeft" aria-label="Move timeline left">&laquo;</button>
+        <button id="zoomIn" aria-label="Zoom in">+</button>
+        <button id="zoomOut" aria-label="Zoom out">-</button>
+        <button id="moveRight" aria-label="Move timeline right">&raquo;</button>
+      </div>
+    </section>
+
+    <!-- Trace Details Section -->
+    <section id="details">
+      <div class="details-header">
+        <h2>Trace Details</h2>
+        <div>
+          <input type="text" id="id_input" placeholder="Enter Trace ID" aria-label="Trace ID">
+          <button id="goto" aria-label="Go to Trace ID">Go to</button>
+        </div>
+      </div>
+      <div id="trace-info" aria-live="polite">
+        Click on a trace to view details here.
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>2024 RATELProf.</p>
+  </footer>
+</body>
+</html>
+
