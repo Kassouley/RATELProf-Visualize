@@ -1,5 +1,5 @@
 import { processTraces } from './trace_processing.js';
-import { prettyPrint } from './utils.js';
+import { getMemKind, prettyPrint } from './utils.js';
 
 
 /*
