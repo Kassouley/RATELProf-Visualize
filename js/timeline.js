@@ -70,8 +70,8 @@ function getTimelineOptions(minStart, maxEnd) {
             }
         },
         stack: false,
-        min: minStart / 1000,
-        max: maxEnd / 1000,
+        min: (minStart / 1000) - 1000,
+        max: (maxEnd / 1000) + 1000,
         groupHeightMode: 'fixed',
         orientation: "both",
         groupEditable: { order: true },

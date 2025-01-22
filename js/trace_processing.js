@@ -181,6 +181,5 @@ export function processTraces(data) {
   const main_duration = addLifecycleItems();
   addTraceEventItems();
   addGroups();
-
-  return { items, groups, minStart, maxEnd };
+  return { items, groups, minStart , maxEnd };
 }
