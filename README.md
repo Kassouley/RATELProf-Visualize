@@ -43,7 +43,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE.txt) f
 
 ## Acknowledgments
 
-- [RATEL Profiler]() for providing the profiling data.
+- [RATEL Profiler](https://github.com/Kassouley/RATELProf) for providing the profiling data.
 
 - [VIS Timeline](https://github.com/visjs/vis-timeline) for data visualization components.
 
