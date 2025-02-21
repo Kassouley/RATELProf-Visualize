@@ -11,6 +11,7 @@
 
 
   <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/csv.js"></script>
 
 
   <link rel="stylesheet" href="css/global.css">
@@ -93,19 +94,16 @@
 
       <script>
         function openTab(event, tabId) {
-            // Cacher tous les contenus des onglets
             var contents = document.getElementsByClassName("tab-content");
             for (var i = 0; i < contents.length; i++) {
                 contents[i].classList.remove("active");
             }
 
-            // Désactiver tous les boutons d'onglets
             var buttons = document.getElementsByClassName("tab-button");
             for (var i = 0; i < buttons.length; i++) {
                 buttons[i].classList.remove("active");
             }
 
-            // Afficher le contenu de l'onglet cliqué
             document.getElementById(tabId).classList.add("active");
             event.currentTarget.classList.add("active");
         }
