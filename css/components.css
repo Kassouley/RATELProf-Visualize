@@ -9,17 +9,15 @@
 }
 
 #details {
-    padding: 15px;
     background-color: var(--secondary-bg);
-    border: 1px solid var(--border-color);
+    border: none;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 #trace-info {
     font-size: 1rem;
-    padding: 10px;
     background-color: var(--secondary-bg);
     border-radius: 4px;
-    border: 1px solid var(--border-color);
+    border: none;
 }

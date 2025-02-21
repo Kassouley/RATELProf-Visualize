@@ -1,33 +1,4 @@
 
-.details-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.details-header input[type="text"] {
-    padding: 6px;
-    font-size: 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    width: 200px;
-}
-
-.details-header button {
-    padding: 6px;
-    font-size: 1rem;
-    color: #fff;
-    background-color: var(--primary-color);
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-.details-header button:hover {
-    background-color: var(--secondary-color);
-}
-
 .two-column-flex {
     display: flex;
     gap: 10px;

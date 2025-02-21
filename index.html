@@ -15,7 +15,10 @@
 
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/buttons.css">
+  <link rel="stylesheet" href="css/navigation.css">
+  <link rel="stylesheet" href="css/tab.css">
+  <link rel="stylesheet" href="css/csv.css">
+  <link rel="stylesheet" href="css/button.css">
   <link rel="stylesheet" href="css/vis-custom.css">
   <link rel="stylesheet" href="css/timeline-section.css">
   <link rel="stylesheet" href="css/details-section.css">
@@ -23,7 +26,7 @@
 
 <body>
   <!-- Page Header -->
-  <div class="details-header">
+  <div class="header">
     <div class="title">
       <img src="assets/images/ratel_logo.png" alt="Logo" class="ratel-logo">
       <h1>RATELProf Timeline Visualization</h1> 
@@ -32,7 +35,7 @@
       <button id="loadFileButton" aria-label="Load JSON File">Load JSON File</button>
       <input type="file" id="fileInput" accept=".json" style="display:none;">
     </div>
-</div>
+  </div>
   
 
   <main>
@@ -43,6 +46,10 @@
 
     <!-- Navigation Section -->
     <section id="navigation">
+      <div class="trace-select">
+        <input type="text" id="id_input" placeholder="Enter Trace ID" aria-label="Trace ID">
+        <button id="goto" aria-label="Go to Trace ID">Go to</button>
+      </div>
       <div class="menu">
         <button id="moveLeft" aria-label="Move timeline left">&laquo;</button>
         <button id="zoomIn" aria-label="Zoom in">+</button>
@@ -53,16 +60,56 @@
 
     <!-- Trace Details Section -->
     <section id="details">
-      <div class="details-header">
-        <h2>Trace Details</h2>
-        <div>
-          <input type="text" id="id_input" placeholder="Enter Trace ID" aria-label="Trace ID">
-          <button id="goto" aria-label="Go to Trace ID">Go to</button>
+      <div class="tabs">
+        <button class="tab-button active" onclick="openTab(event, 'tab1')">Trace Details</button>
+        <button class="tab-button"        onclick="openTab(event, 'tab2')">Statistics</button>
+        <button class="tab-button"        onclick="openTab(event, 'tab3')">Analyze</button>
+      </div>
+
+        <!-- Contenu des onglets -->
+      <div id="tab1" class="tab-content active">
+        <div id="trace-info" aria-live="polite">
+          Click on a trace to view details here.
         </div>
       </div>
-      <div id="trace-info" aria-live="polite">
-        Click on a trace to view details here.
+
+      <div id="tab2" class="tab-content">
+        <div id="csv-container">
+          <!-- Left Column: CSV Names -->
+          <div class="csv-list">
+              <ul id="csvList"></ul>
+          </div>
+
+          <!-- Right Column: CSV Content -->
+          <div class="csv-content" id="csvContent">
+              Select a CSV file to view its data
+          </div>
+        </div>
       </div>
+
+      <div id="tab3" class="tab-content">
+          <h3>WIP</h3>
+      </div>
+
+      <script>
+        function openTab(event, tabId) {
+            // Cacher tous les contenus des onglets
+            var contents = document.getElementsByClassName("tab-content");
+            for (var i = 0; i < contents.length; i++) {
+                contents[i].classList.remove("active");
+            }
+
+            // Désactiver tous les boutons d'onglets
+            var buttons = document.getElementsByClassName("tab-button");
+            for (var i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove("active");
+            }
+
+            // Afficher le contenu de l'onglet cliqué
+            document.getElementById(tabId).classList.add("active");
+            event.currentTarget.classList.add("active");
+        }
+      </script>
     </section>
   </main>
 

@@ -16,12 +16,12 @@ function getTimelineOptions(minStart, maxEnd) {
             template: trace => {
               let tooltip = `<div><strong>${trace.content}</strong><br>`;
               if (trace.domain === "DISPATCH") {
-                tooltip += "<strong>Event Dispatched:</strong> ${trace.event_dispatched_name} (${trace.event_dispatched_id})<br>" +
-                           "<strong>Dispatch Time:</strong> ${trace.dispatch_time}";
+                tooltip += `<strong>Event Dispatched:</strong> ${trace.event_dispatched_name} (${trace.event_dispatched_id})<br>` +
+                           `<strong>Dispatch Time:</strong> ${trace.dispatch_time}`;
               } else {
-                tooltip += "<strong>ID:</strong> ${trace.id}<br>" +
-                            "<strong>CID:</strong> ${trace.corr_id}<br>" +
-                            "<strong>Duration:</strong> ${trace.traceData.dur} ns<br>";
+                tooltip += `<strong>ID:</strong> ${trace.id}<br>` +
+                           `<strong>CID:</strong> ${trace.corr_id}<br>` +
+                           `<strong>Duration:</strong> ${trace.traceData.dur} ns<br>`;
               }
               tooltip += "</div>";
               return tooltip;
@@ -73,7 +73,7 @@ function getTimelineOptions(minStart, maxEnd) {
         min: (minStart / 1000) - 1000,
         max: (maxEnd / 1000) + 1000,
         groupHeightMode: 'fixed',
-        orientation: "both",
+        orientation: "none",
         groupEditable: { order: true },
         margin: { item: 10, axis: 5 },
         zoomMin: 5
@@ -192,10 +192,10 @@ export function createTimeline(data) {
 
         if (domainHandlers[trace.domain]) domainHandlers[trace.domain]();
 
-        traceInfo.innerHTML = "<div class=\"two-column-flex\">" +
-                                "<div class=\"column\">${commonDetails.join(\"\n\")}</div>" +
-                                "<div class=\"column\">${domainSpecificDetails.join(\"\n\")}</div>" +
-                            "</div>";
+        traceInfo.innerHTML = '<div class="two-column-flex">' +
+                                `<div class="column">${commonDetails.join("\n")}</div>` +
+                                `<div class="column">${domainSpecificDetails.join("\n")}</div>` +
+                              '</div>';
     };
 
 
