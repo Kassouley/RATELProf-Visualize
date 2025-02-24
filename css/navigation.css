@@ -15,6 +15,8 @@
 
 .menu button {
     padding: 8px 16px;
+    margin-left: 2px;
+    margin-right: 2px;
 }
 
 .trace-select {

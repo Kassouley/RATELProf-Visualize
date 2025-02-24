@@ -1,36 +1,62 @@
 #csv-container {
     display: flex;
-    margin-top: 20px;
+    font-size: 14px;
 }
 .csv-list {
     width: 15%;
     border-right: 1px solid #ccc;
-    padding-right: 20px;
+    padding-right: 10px;
     list-style-type: none;
 }
 .csv-list li {
     cursor: pointer;
-    margin: 10px 0;
-    padding: 5px;
     background-color: var(--primary-bg);
+    padding: 8px;
+    margin-bottom: 10px;
     border-radius: 5px;
 }
+.csv-list ul {
+    list-style-type: none;
+    padding: 0; 
+    margin: 0;
+}
 .csv-list li:hover {
-    background-color: var(--primary-bg);
+    background-color: var(--secondary-bg);
 }
 .csv-content {
-    width: 85%;
-    padding: 20px;
+    width: 100%;
+    padding-left: 10px;
+    max-height: 400px;
+    overflow-y: auto; 
+    overflow-x: auto;
 }
 table {
     width: 100%;
     border-collapse: collapse;
 }
-th, td {
-    border: 1px solid black;
+td {
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
     padding: 8px;
     text-align: left;
 }
 th {
-    background-color: var(--secondary-bg);
+    text-align: left;
+    font-weight: bold;
+    white-space: nowrap;
+    padding: 8px;
+    color: white;
+    background-color: var(--primary-color);
+}
+
+tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+tr:hover {
+    background-color: #f1f1f1;
+}
+
+tr {
+    transition: background-color 0.2s ease;
 }

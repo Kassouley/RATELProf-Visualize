@@ -17,7 +17,7 @@ function displayCSV(csvObject) {
 // Function to create the list of CSV names
 function createCSVList() {
     const listContainer = document.getElementById("csvList");
-    csvArray.forEach((csv, index) => {
+    csv_stats.forEach((csv, index) => {
         const li = document.createElement("li");
         li.textContent = csv.name;
         li.addEventListener("click", () => showCSVContent(index));
@@ -28,7 +28,7 @@ function createCSVList() {
 // Function to show the selected CSV content
 function showCSVContent(index) {
     const contentContainer = document.getElementById("csvContent");
-    contentContainer.innerHTML = displayCSV(csvArray[index]);
+    contentContainer.innerHTML = displayCSV(csv_stats[index]);
 }
 
 // Initialize the CSV list and set default content

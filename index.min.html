@@ -10,13 +10,15 @@
   <link rel="stylesheet" href="https://unpkg.com/vis-timeline/styles/vis-timeline-graph2d.min.css">
 
 
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.min.js"></script>
+  <script type="module" src="js/csv.js"></script>
 
 
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/navigation.css">
   <link rel="stylesheet" href="css/tab.css">
+  <link rel="stylesheet" href="css/csv.css">
   <link rel="stylesheet" href="css/button.css">
   <link rel="stylesheet" href="css/vis-custom.css">
   <link rel="stylesheet" href="css/timeline-section.css">
@@ -29,10 +31,6 @@
     <div class="title">
       <img src="assets/images/ratel_logo.png" alt="Logo" class="ratel-logo">
       <h1>RATELProf Timeline Visualization</h1> 
-    </div>
-    <div id="json-buttons">
-      <button id="loadFileButton" aria-label="Load JSON File">Load JSON File</button>
-      <input type="file" id="fileInput" accept=".json" style="display:none;">
     </div>
   </div>
   
@@ -60,7 +58,9 @@
     <!-- Trace Details Section -->
     <section id="details">
       <div class="tabs">
-        <button class="tab-button active">Trace Details</button>
+        <button class="tab-button active" onclick="openTab(event, 'tab1')">Trace Details</button>
+        <button class="tab-button"        onclick="openTab(event, 'tab2')">Statistics</button>
+        <button class="tab-button"        onclick="openTab(event, 'tab3')">Analyze</button>
       </div>
 
         <!-- Contenu des onglets -->
@@ -69,6 +69,41 @@
           Click on a trace to view details here.
         </div>
       </div>
+
+      <div id="tab2" class="tab-content">
+        <div id="csv-container">
+          <!-- Left Column: CSV Names -->
+          <div class="csv-list">
+              <ul id="csvList"></ul>
+          </div>
+
+          <!-- Right Column: CSV Content -->
+          <div class="csv-content" id="csvContent">
+              Select a CSV file to view its data
+          </div>
+        </div>
+      </div>
+
+      <div id="tab3" class="tab-content">
+          <h3>WIP</h3>
+      </div>
+
+      <script>
+        function openTab(event, tabId) {
+            var contents = document.getElementsByClassName("tab-content");
+            for (var i = 0; i < contents.length; i++) {
+                contents[i].classList.remove("active");
+            }
+
+            var buttons = document.getElementsByClassName("tab-button");
+            for (var i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove("active");
+            }
+
+            document.getElementById(tabId).classList.add("active");
+            event.currentTarget.classList.add("active");
+        }
+      </script>
     </section>
   </main>
 
