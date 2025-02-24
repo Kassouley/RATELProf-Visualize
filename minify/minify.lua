@@ -7,7 +7,7 @@ local merge_css = require("merge_css")
 local function main(arg)
     local absolute_path = lfs.get_script_path(1).."../"
     
-    local html_file = lfs.open_file(absolute_path.."index.html", "r")
+    local html_file = lfs.open_file(absolute_path.."index.min.html", "r")
     local html_content = html_file:read("*all")
     html_file:close()
 

@@ -49,13 +49,9 @@ end
 
 local function extract_js_paths(html, absolute_path)
     local paths = {}
-    local dir = lfs.get_script_path(1).."../../visualize/"
     html = html:gsub('<script[^>]*src="([^"]+)"[^>]*></script>', function(path)
         path = absolute_path..path
         if lfs.file_exists(path) then
-                if path == absolute_path.."js/main.js" then
-                    path = absolute_path.."js/main.min.js"
-                end
                 -- Store the matched src path
                 table.insert(paths, path)
                 return ""  -- Remove the <script> tag
