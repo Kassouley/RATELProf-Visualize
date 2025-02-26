@@ -1,8 +1,3 @@
-export function getMemKind(kind) {
-    const kinds = { 0: "Host", 1: "Device" };
-    return kinds[parseInt(kind, 10)] || "Unknown";
-}
-
 export function getDomainNameFromId(domainIDs, traceDomain) {
     return domainIDs[traceDomain]?.name.replace("RATELPROF_", "").replaceAll("_", " ") || "Unknown Domain";
 }

@@ -1,9 +1,10 @@
-import { getMemKind, getDomainNameFromId, getDomainDescFromId, hashStringToLightColor } from './utils.js';
+import { getDomainNameFromId, getDomainDescFromId, hashStringToLightColor } from './utils.js';
 
 export function processTraces(data) {
   const traceEvents = data.trace_events;
   const lcEvents = data.lifecycle;
   const domainIDs = data.domain_id;
+  const nodeIDs = data.node_id;
   // const phaseIDs = data.phase_id;
   const items = [];
   const groups = [];
@@ -43,44 +44,59 @@ export function processTraces(data) {
   };
 
   const computeDepth = (event) => {
-    if (depthMap.has(event.id)) return depthMap.get(event.id);
-    if (!event.corr_id || !idMap.has(event.corr_id)) return 1;
+      if (depthMap.has(event.id)) return depthMap.get(event.id);
+      if (!event.corr_id || !idMap.has(event.corr_id)) return 1;
 
-    const depth = 1 + computeDepth(idMap.get(event.corr_id));
-    depthMap.set(event.id, depth);
-    return depth;
+      const depth = 1 + computeDepth(idMap.get(event.corr_id));
+      depthMap.set(event.id, depth);
+      return depth;
   };
 
-  const mapDomainAndName = (traceDomain, event) => {
-    const mappings = {
-      16: { domain: "MEMORY", name: `Copy${getMemKind(event.args?.src_type)}To${getMemKind(event.args?.dst_type)}` },
-      17: { domain: "KERNEL", name: event.args?.kernel_name || "N/A" },
-      18: { domain: "BARRIER", name: "Barrier Or" },
-      19: { domain: "BARRIER", name: "Barrier And" },
-    };
-    return mappings[traceDomain] || { domain: "CPU", name: event.name || "N/A" };
+  const getMemKind = (kind) => {
+      const kinds = { 0: "Host", 1: "Device" };
+      return kinds[parseInt(kind, 10)] || "Unknown";
   };
 
-  const createNestedGroup = (traceDomain, event, eventName) => {
+  const getNodeIdFromAgent = (agentId) => {
+    return nodeIDs[agentId] || "N/A";
+  };
+
+
+  const preprocessTraceEvents = (event) => {
+    const traceDomain = event.d;
     if ([17, 18, 19].includes(traceDomain)) {
-      return {
-        id: `${traceDomain}_${event.args.gpu_id}`,
-        name: `GPU ID. ${event.args.gpu_id}`,
-        kind: "GPU"
+      if (traceDomain === 17) {
+        event._event_name = event.args?.kernel_name || "N/A";
+        event._event_kind = "KERNEL";
+      } else if (traceDomain === 18) {
+        event._event_name = "Barrier Or";
+        event._event_kind = "BARRIER";
+      } else if (traceDomain === 19) {
+        event._event_name = "Barrier And";
+        event._event_kind = "BARRIER";
       };
+      event._event_node_id     = getNodeIdFromAgent(event.args.gpu_id);
+      event._nested_group_id   = `${traceDomain}_${event.args.gpu_id}`;
+      event._nested_group_name = `GPU Node ID. ${event._event_node_id}`;
+      event._subgroup_id       = event.args.queue_id || 1
+    } else if (traceDomain === 16) {
+      event._copy_src_kind     = getMemKind(event.args.src_type);
+      event._copy_dst_kind     = getMemKind(event.args.dst_type);
+      event._copy_src_node_id  = getNodeIdFromAgent(event.args.src_agent);
+      event._copy_dst_node_id  = getNodeIdFromAgent(event.args.dst_agent);
+      event._event_name        = `Copy${event._copy_src_kind}To${event._copy_dst_kind}`;
+      event._event_kind        = "MEMORY";
+      event._nested_group_id   = `${traceDomain}_${event._event_name}`;
+      event._nested_group_name = event._event_name;
+      event._subgroup_id       = 1
+    } else {
+      event._event_name        = event.name;
+      event._event_kind        = "CPU";
+      event._nested_group_id   = `${traceDomain}_${event.tid}`;
+      event._nested_group_name = `TID. ${event.tid}`;
+      event._subgroup_id       = computeDepth(event);
     }
-    if (traceDomain === 16) {
-      return {
-        id: `${traceDomain}_${eventName}`,
-        name: eventName,
-        kind: "GPU"
-      };
-    }
-    return {
-      id: `${traceDomain}_${event.tid}`,
-      name: `TID. ${event.tid}`,
-      kind: "CPU"
-    };
+    event._event_color = hashStringToLightColor(event._event_name);
   };
 
   const addTraceEventItems = () => {
@@ -88,62 +104,61 @@ export function processTraces(data) {
       idMap.set(event.id, event);
     });
     traceEvents.forEach((event) => {
-      const depth = computeDepth(event);
-      const { domain, name: eventName } = mapDomainAndName(event.d, event);
-      const { id: groupId, name: groupName, kind } = createNestedGroup(event.d, event, eventName);
+      preprocessTraceEvents(event);
 
       if (event.start < minStart) minStart = event.start;
       if (event.end > maxEnd) maxEnd = event.end;
 
       if ([17, 18, 19].includes(event.d)) {
         items.push({
-        className: 'non-highlighted',
+          className: 'non-highlighted',
           style: 'background-color: '+hashStringToLightColor("Dispatch"),
           id: `Dispatch_${event.id}`,
           corr_id: event.id,
           content: "Dispatch",
-          subgroup: depth,
+          subgroup: event._subgroup_id,
           start: event.args.dispatch_time / 1000,
           end: (event.args.dispatch_time + 1000) / 1000,
-          group: groupId,
-          event_dispatched_id: event.id,
-          event_dispatched_name: eventName,
-          dispatch_time: event.args.dispatch_time,
-          domain: "DISPATCH"
+          group: event._nested_group_id,
+          traceData: {
+            _event_name: event._event_name,
+            _event_kind: "DISPATCH",
+            _event_id: event.id,
+            _event_dispatch_time: event.args.dispatch_time
+          }
         });
       }
 
       items.push({
         className: 'non-highlighted',
-        style: 'background-color: '+hashStringToLightColor(eventName),
-        id: event.id,
-        corr_id: event.corr_id,
-        content: eventName,
-        start: Math.round(event.start / 1000),
-        end: Math.round(event.end / 1000),
-        group: groupId,
-        subgroup: depth,
+        style:     'background-color: '+event._event_color,
+        id:        event.id,
+        corr_id:   event.corr_id,
+        content:   event._event_name,
+        start:     Math.round(event.start / 1000),
+        end:       Math.round(event.end / 1000),
+        group:     event._nested_group_id,
+        subgroup:  event._subgroup_id,
         limitSize: true,
         traceData: event,
-        domain: domain
       });
 
       if (!groupsTmp[event.d]) {
         groupsTmp[event.d] = [];
       }
 
-      if (!groupsTmp[event.d].some((group) => group.id === groupId)) {
+      if (!groupsTmp[event.d].some((group) => group.id === event._nested_group_id)) {
         groupsTmp[event.d].push({
-          style: "color: var(--text-color); background-color: var(--secondary-tl); font-size: 13px; text-align: right; border-color: var(--border-color);",
-          id: groupId,
-          value: event.d,
-          content: groupName,
-          treeLevel: 2,
+          style:         "color: var(--text-color); background-color: var(--secondary-tl); font-size: 13px; text-align: right; border-color: var(--border-color);",
+          id:            event._nested_group_id,
+          value:         event.d,
+          content:       event._nested_group_name,
+          treeLevel:     2,
           totalDuration: 0,
-          kind: kind
+          isGpuGroup:    event._event_kind != "CPU"
         });
-      }
-      const targetGroup = groupsTmp[event.d].find((group) => group.id === groupId);
+      };
+      const targetGroup = groupsTmp[event.d].find((group) => group.id === event._nested_group_id);
       if (targetGroup) {
         targetGroup.totalDuration += event.dur;
       }
@@ -155,25 +170,25 @@ export function processTraces(data) {
     let cpuCounter = Object.entries(groupsTmp).length; // Start CPU counter from the largest value
 
     Object.entries(groupsTmp).forEach(([traceDomain, nestedGroups]) => {
-      let isGPU = nestedGroups[0].kind=="GPU";
-      nestedGroups.forEach(item => {
-        if (item.kind == "GPU") {
-          const percent = (item.totalDuration/main_duration)*100;
-          item.content = item.content+"<div style=\"font-size: 9px\">GPU USAGE: "+percent.toFixed(2)+"%";
-        }
-      });
+      let isGPU = nestedGroups[0].isGpuGroup;
+      if (isGPU) {
+        nestedGroups.forEach(nestedGroup => {
+          const percent = (nestedGroup.totalDuration/main_duration)*100;
+          nestedGroup.content = nestedGroup.content+"<div style=\"font-size: 9px\">GPU USAGE: "+percent.toFixed(2)+"%";
+        });
+      };
       groups.push(...nestedGroups);
       groups.push({
-        className: "groupClass",
-        style: "color: var(--text-color); background-color: var(--primary-tl); font-size: 13px; text-align: left; border-color: var(--border-color)",
-        treeLevel: 1,
-        id: traceDomain,
-        content: getDomainNameFromId(domainIDs, traceDomain),
-        desc: getDomainDescFromId(domainIDs, traceDomain),
-        value: isGPU ? gpuCounter++ : cpuCounter--,
-        subgroupStack: true,
-        showNested: isGPU,
-        nestedGroups: nestedGroups.map((group) => group.id),
+        className:      "groupClass",
+        style:          "color: var(--text-color); background-color: var(--primary-tl); font-size: 13px; text-align: left; border-color: var(--border-color)",
+        treeLevel:      1,
+        id:             traceDomain,
+        content:        getDomainNameFromId(domainIDs, traceDomain),
+        desc:           getDomainDescFromId(domainIDs, traceDomain),
+        value:          isGPU ? gpuCounter++ : cpuCounter--,
+        subgroupStack:  true,
+        showNested:     isGPU,
+        nestedGroups:   nestedGroups.map((group) => group.id),
       });
     });
   };

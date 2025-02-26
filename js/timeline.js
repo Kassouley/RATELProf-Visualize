@@ -1,5 +1,5 @@
 import { processTraces } from './trace_processing.js';
-import { getMemKind, prettyPrint } from './utils.js';
+import { prettyPrint } from './utils.js';
 
 
 /*
@@ -15,9 +15,9 @@ function getTimelineOptions(minStart, maxEnd) {
             followMouse: true,
             template: trace => {
               let tooltip = `<div><strong>${trace.content}</strong><br>`;
-              if (trace.domain === "DISPATCH") {
-                tooltip += `<strong>Event Dispatched:</strong> ${trace.event_dispatched_name} (${trace.event_dispatched_id})<br>` +
-                           `<strong>Dispatch Time:</strong> ${trace.dispatch_time}`;
+              if (trace.traceData._event_kind === "DISPATCH") {
+                tooltip += `<strong>Event Dispatched:</strong> ${trace.traceData._event_name} (${trace.traceData._event_id})<br>` +
+                           `<strong>Dispatch Time:</strong> ${trace.traceData._event_dispatch_time}`;
               } else {
                 tooltip += `<strong>ID:</strong> ${trace.id}<br>` +
                            `<strong>CID:</strong> ${trace.corr_id}<br>` +
@@ -144,9 +144,10 @@ export function createTimeline(data) {
         const traceArgs = traceData.args || {};
         const commonDetails = [];
         const domainSpecificDetails = [];
+
         commonDetails.push(createDetails("Name", trace.content));
         if (trace.domain === "DISPATCH") {
-            commonDetails.push(createDetails("Event Dispatched", `${trace.event_dispatched_name} (${trace.event_dispatched_id})`));
+            commonDetails.push(createDetails("Event Dispatched", `${traceData._event_name} (${traceData._event_id})`));
             commonDetails.push(createDetails("Dispatch Time", trace.start));
         } else {
             commonDetails.push(createDetails("ID", trace.id));
@@ -166,7 +167,7 @@ export function createTimeline(data) {
             },
             KERNEL: () => {
                 append(commonDetails, "Dispatch Time", traceArgs.dispatch_time);
-                append(domainSpecificDetails, "GPU ID", traceArgs.gpu_id);
+                append(domainSpecificDetails, "GPU Node ID", `${traceData._event_node_id} (${traceArgs.gpu_id})`);
                 append(domainSpecificDetails, "Queue ID", traceArgs.queue_id);
                 append(domainSpecificDetails, "Block Dimension", `[${traceArgs.wrg.join(", ")}]`);
                 append(domainSpecificDetails, "Grid Dimension", `[${traceArgs.grd.join(", ")}]`);
@@ -178,19 +179,19 @@ export function createTimeline(data) {
             },
             BARRIER: () => {
                 append(commonDetails, "Dispatch Time", traceArgs.dispatch_time);
-                append(domainSpecificDetails, "GPU ID", traceArgs.gpu_id);
+                append(domainSpecificDetails, "GPU Node ID", `${traceData._event_node_id} (${traceArgs.gpu_id})`);
                 append(domainSpecificDetails, "Queue ID", traceArgs.queue_id);
                 append(domainSpecificDetails, "Completion Signal", traceData.sig);
             },
             MEMORY: () => {
-                append(domainSpecificDetails, "Source", `${getMemKind(traceArgs.src_type)} ID. ${traceArgs.src_agent}`);
-                append(domainSpecificDetails, "Destination", `${getMemKind(traceArgs.dst_type)} ID. ${traceArgs.dst_agent}`);
+                append(domainSpecificDetails, "Source", `${traceData._copy_src_kind} Node ID. ${traceData._copy_src_node_id} (${traceArgs.src_agent})`);
+                append(domainSpecificDetails, "Destination", `${traceData._copy_dst_kind} Node ID. ${traceData._copy_dst_node_id} (${traceArgs.dst_agent})`);
                 append(domainSpecificDetails, "Size transferred", `${traceArgs.size} bytes`);
                 append(domainSpecificDetails, "Completion Signal", traceData.sig);
             }
         };
 
-        if (domainHandlers[trace.domain]) domainHandlers[trace.domain]();
+        if (domainHandlers[traceData._event_kind]) domainHandlers[traceData._event_kind]();
 
         traceInfo.innerHTML = '<div class="two-column-flex">' +
                                 `<div class="column">${commonDetails.join("\n")}</div>` +
