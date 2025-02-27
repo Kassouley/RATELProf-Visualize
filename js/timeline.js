@@ -1,6 +1,38 @@
-import { processTraces } from './trace_processing.js';
-import { prettyPrint } from './utils.js';
+function prettyPrint(obj, indentLevel = 0) {
+    let html = '';
+  const indentClass = 'indent'.repeat(indentLevel);
 
+  for (const key in obj) {
+    const field = obj[key];
+    if (typeof field === 'object' && field !== null) {
+      if (field.type && field.value) {
+        html += `<div class="${indentClass}"><span class="type">${field.type}</span> <span class="key">${key}</span> =  `;
+        if (field.value["->*"]) {
+          const keys = Object.keys(field.value);
+          keys.forEach((subfield, index) => {
+            if (index < keys.length - 1) {
+              html += `<span class="value">${field.value[subfield]}</span> -> `;
+            } else {
+              html += prettyPrint(field.value[subfield], indentLevel + 1);
+            }
+          });
+          html += `</div>`;
+        } else if (typeof field.value === 'object') {
+          html += `{<div class="indent">`;
+          html += prettyPrint(field.value, indentLevel + 1); 
+          html += `</div>}</div>`;
+        } else {
+          html += `<span class="value">${field.value}</span></div>`;
+        }
+      } else {
+        html += `<div class="${indentClass}"><span class="key">${key}</span> = {<div class="indent">`;
+        html += prettyPrint(field, indentLevel + 1); // Recurse for other nested objects
+        html += `</div>}</div>`;
+      }
+    }
+  }
+  return html;
+}
 
 /*
  * Get options array for the timeline instance.
@@ -80,7 +112,7 @@ function getTimelineOptions(minStart, maxEnd) {
     };
 }
 
-export function createTimeline(data) {
+function createTimeline(data) {
     const { items, groups, minStart, maxEnd } = processTraces(data);
     const highlightedItems = [];
     const container = document.getElementById("timeline");
@@ -146,7 +178,7 @@ export function createTimeline(data) {
         const domainSpecificDetails = [];
 
         commonDetails.push(createDetails("Name", trace.content));
-        if (trace.domain === "DISPATCH") {
+        if (traceData._event_kind === "DISPATCH") {
             commonDetails.push(createDetails("Event Dispatched", `${traceData._event_name} (${traceData._event_id})`));
             commonDetails.push(createDetails("Dispatch Time", trace.start));
         } else {
@@ -217,7 +249,6 @@ export function createTimeline(data) {
                 highlightedItems.push({ id: item.id, className: 'highlighted'});
             }
         });
-
         itemsDataSet.update(highlightedItems);
     };
 

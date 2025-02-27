@@ -1,6 +1,22 @@
-import { getDomainNameFromId, getDomainDescFromId, hashStringToLightColor } from './utils.js';
+function hashStringToLightColor(str) {
+  // Simple hash function to generate a color
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Convert hash to a light hexadecimal color
+  let color = "#";
+  for (let i = 0; i < 3; i++) {
+      const value = ((hash >> (i * 8)) & 0xFF); // Extract 8 bits
+      const lightValue = Math.floor((value / 2) + 127); // Ensure the value is in the light range (127–255)
+      color += ("00" + lightValue.toString(16)).slice(-2);
+  }
+  
+  return color;
+}
 
-export function processTraces(data) {
+function processTraces(data) {
   const traceEvents = data.trace_events;
   const lcEvents = data.lifecycle;
   const domainIDs = data.domain_id;
@@ -58,7 +74,8 @@ export function processTraces(data) {
   };
 
   const getNodeIdFromAgent = (agentId) => {
-    return nodeIDs[agentId] || "N/A";
+    const ret = nodeIDs[agentId];
+    return ret == undefined ? "N/A" : ret;
   };
 
 
@@ -165,6 +182,14 @@ export function processTraces(data) {
     });
   };
 
+  const getDomainNameFromId = (traceDomain) => {
+    return domainIDs[traceDomain]?.name.replace("RATELPROF_", "").replaceAll("_", " ") || "Unknown Domain";
+  };
+
+  const getDomainDescFromId = (traceDomain) => {
+    return domainIDs[traceDomain]?.desc || "Unknown Domain";
+  };
+
   const addGroups = () => {
     let gpuCounter = 1; // Start GPU counter from the smallest value
     let cpuCounter = Object.entries(groupsTmp).length; // Start CPU counter from the largest value
@@ -183,8 +208,8 @@ export function processTraces(data) {
         style:          "color: var(--text-color); background-color: var(--primary-tl); font-size: 13px; text-align: left; border-color: var(--border-color)",
         treeLevel:      1,
         id:             traceDomain,
-        content:        getDomainNameFromId(domainIDs, traceDomain),
-        desc:           getDomainDescFromId(domainIDs, traceDomain),
+        content:        getDomainNameFromId(traceDomain),
+        desc:           getDomainDescFromId(traceDomain),
         value:          isGPU ? gpuCounter++ : cpuCounter--,
         subgroupStack:  true,
         showNested:     isGPU,
