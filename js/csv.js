@@ -17,7 +17,7 @@ function displayCSV(csvObject) {
     // Table rows
     for (let i = 1; i < rows.length; i++) {
         const cols = rows[i].split(",");
-        html += "<tr><td>" + cols.join("</td><td>") + "</td></tr>";
+        html += `<tr onclick="handleRowClick(this)"><td>` + cols.join("</td><td>") + "</td></tr>";
     }
 
     html += "</tbody></table>";
@@ -83,6 +83,14 @@ function showCSVContent(index) {
     const contentContainer = document.getElementById("csvContent");
     contentContainer.innerHTML = displayCSV(csv_stats[index]);
     currentSortColumn = null; // Reset sorting when switching files
+}
+
+function handleRowClick(row) {
+    var itemsDataSet = timelineObject.itemsData;
+    const itemName = row.lastElementChild.textContent.trim();
+    const matchingItems = itemsDataSet.get().filter(item => item.content === itemName);
+    const ids = matchingItems.flat().map(item => item.id);
+    timelineObject.setSelection(ids, { focus: true } );
 }
 
 createCSVList();

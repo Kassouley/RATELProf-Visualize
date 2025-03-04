@@ -1,4 +1,28 @@
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
+.info-table th, 
+.info-table td {
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.info-table th {
+    width: 20%;
+    font-weight: bold;
+}
+
+.info-table tr {
+    border-bottom: 1px solid var(--border-color);;  
+}
+
+.info-table tr:last-child {
+    border-bottom: none;
+}
+
+  
 .two-column-flex {
     display: flex;
     gap: 10px;
@@ -6,8 +30,6 @@
 
 .column {
     flex: 1;
-    padding: 10px;
-    border: 1px solid var(--border-color);
 }
 
 .indent {
