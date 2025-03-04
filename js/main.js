@@ -1,3 +1,5 @@
+let timelineObject = null;
+
 async function loadTraceDataFromFile(file) {
     try {
         console.log("Loading JSON...");
@@ -6,10 +8,8 @@ async function loadTraceDataFromFile(file) {
         console.log("Finished.");
 
         console.log("Timeline Creation...");
-        const timeline = createTimeline(data);
+        timelineObject = createTimeline(data);
         console.log("Finished.");
-
-        return timeline;
     } catch (error) {
         alert('Error loading trace data: ' + error.message);
         console.error('Error loading trace data:', error);
@@ -26,8 +26,6 @@ function setupFileLoader() {
         return;
     }
 
-    let timeline = null;
-
     // Attach event listener to button for file input trigger
     loadFileButton.addEventListener('click', () => fileInput.click());
 
@@ -35,10 +33,10 @@ function setupFileLoader() {
     fileInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (file) {
-            if (timeline) {
-                timeline.destroy();
+            if (timelineObject) {
+                timelineObject.destroy();
             }
-            timeline = await loadTraceDataFromFile(file);
+            await loadTraceDataFromFile(file);
         }
 
         // Clear the file input for subsequent uploads

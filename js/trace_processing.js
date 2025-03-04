@@ -82,10 +82,10 @@ function processTraces(data) {
           event.args.grd[i] = event.args.grd[i] / event.args.wrg[i];
         }
       } else if (traceDomain === 18) {
-        event._event_name = "Barrier Or";
+        event._event_name = "BarrierOr";
         event._event_kind = "BARRIER";
       } else if (traceDomain === 19) {
-        event._event_name = "Barrier And";
+        event._event_name = "BarrierAnd";
         event._event_kind = "BARRIER";
       };
       event._event_node_id     = getNodeIdFromAgent(event.args.gpu_id);

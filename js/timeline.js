@@ -117,7 +117,6 @@ function getTimelineOptions(minStart, maxEnd) {
 
 function createTimeline(data) {
     const { items, groups, minStart, maxEnd } = processTraces(data);
-    const highlightedItems = [];
     const container = document.getElementById("timeline");
     const itemsDataSet = new vis.DataSet(items);
     const groupsDataSet = new vis.DataSet(groups);
@@ -126,7 +125,52 @@ function createTimeline(data) {
 
     const timeline = new vis.Timeline(container, itemsDataSet, groupsDataSet, options);
 
-    const createDetails = (field, value) => `<strong>${field}:</strong> ${value}<br>`;
+    const move = percentage => {
+        const range = timeline.getWindow();
+        const interval = range.end - range.start;
+        timeline.setWindow({
+            start: range.start.valueOf() - interval * percentage,
+            end: range.end.valueOf() - interval * percentage
+        });
+    };
+
+    const onSelectTraceAux = id => {
+        const selectedItem = itemsDataSet.get(id);
+        if (selectedItem) {
+            highlightTraces(selectedItem.id);
+            showTraceDetails(selectedItem);
+        }
+    };
+
+    const gotoTrace = () => {
+        const id = parseInt(document.getElementById("id_input").value.trim(), 10);
+        if (!isNaN(id)) {
+            timeline.setSelection(id, { focus: true });
+            onSelectTraceAux(id);
+        } else {
+            alert("Please enter a valid Trace ID.");
+        }
+    };
+
+    const onSelectTrace = properties => {
+        if (properties.items.length > 0) {
+            onSelectTraceAux(properties.items[0]);
+        } else {
+            clearTraceDetails();
+            clearHighlightTraces(itemsDataSet);
+        }
+    };
+
+    const focusOnTrace = properties => {
+        if (properties.what === 'item') {
+            const selectedItem = itemsDataSet.get(properties.item);
+            if (selectedItem) {
+                timeline.focus(selectedItem.id);
+            }
+        }
+    };
+
+    const createDetails = (field, value) => `<tr><th>${field}:</th> <td>${value}</td></tr>`;
 
     const showTraceDetails = trace => {
         const traceInfo = document.getElementById('trace-info');
@@ -183,8 +227,8 @@ function createTimeline(data) {
         if (domainHandlers[traceData._event_kind]) domainHandlers[traceData._event_kind]();
 
         traceInfo.innerHTML = '<div class="two-column-flex">' +
-                                `<div class="column">${commonDetails.join("\n")}</div>` +
-                                `<div class="column">${domainSpecificDetails.join("\n")}</div>` +
+                                `<div class="column"><table class="info-table">${commonDetails.join("\n")}</table></div>` +
+                                `<div class="column"><table class="info-table">${domainSpecificDetails.join("\n")}</table></div>` +
                               '</div>';
     };
 
@@ -193,19 +237,27 @@ function createTimeline(data) {
         document.getElementById('trace-info').innerHTML = 'Click on a trace to view details here.';
     };
 
+    const highlightedOriginalItems = [];
+
     const clearHighlightTraces = () => {
-        itemsDataSet.update(highlightedItems.map(item => ({ id: item.id, className: 'non-highlighted' })));
-        highlightedItems.length = 0;
+        if (highlightedOriginalItems.length) {
+            itemsDataSet.update(highlightedOriginalItems);
+            highlightedOriginalItems.length = 0; // Reset array
+        }
     };
 
-    const highlightTraces = selectedItem => {
+    const highlightTraces = selectedItemId => {
         clearHighlightTraces();
 
-        itemsDataSet.forEach(item => {
-            if (item.corr_id === selectedItem.id) {
-                highlightedItems.push({ id: item.id, className: 'highlighted'});
-            }
-        });
+        const matchingItems = itemsDataSet.get().filter(item => item.corr_id === selectedItemId);
+        if (matchingItems.length === 0) return;
+
+        highlightedOriginalItems.push(...matchingItems);
+        
+        const highlightedItems = matchingItems.map(item => ({
+            id: item.id,
+            className: 'highlighted'
+        }));
         itemsDataSet.update(highlightedItems);
     };
 

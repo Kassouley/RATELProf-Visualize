@@ -8,13 +8,14 @@
 }
 
 .vis-item.vis-selected {
-    box-sizing: content-box;
-    border: 2px solid var(--selected-color);
+    box-sizing: border-box;
+    border: 0px;
+    outline: 2px solid var(--selected-color);
 }
   
 .vis-item.vis-point.vis-selected {
     background-color: rgba(0, 0, 0, 0);
-    border: 0px solid;
+    border: 0px;
 }
 
 .vis-tooltip {
