@@ -125,51 +125,6 @@ function createTimeline(data) {
 
     const timeline = new vis.Timeline(container, itemsDataSet, groupsDataSet, options);
 
-    const move = percentage => {
-        const range = timeline.getWindow();
-        const interval = range.end - range.start;
-        timeline.setWindow({
-            start: range.start.valueOf() - interval * percentage,
-            end: range.end.valueOf() - interval * percentage
-        });
-    };
-
-    const onSelectTraceAux = id => {
-        const selectedItem = itemsDataSet.get(id);
-        if (selectedItem) {
-            highlightTraces(selectedItem.id);
-            showTraceDetails(selectedItem);
-        }
-    };
-
-    const gotoTrace = () => {
-        const id = parseInt(document.getElementById("id_input").value.trim(), 10);
-        if (!isNaN(id)) {
-            timeline.setSelection(id, { focus: true });
-            onSelectTraceAux(id);
-        } else {
-            alert("Please enter a valid Trace ID.");
-        }
-    };
-
-    const onSelectTrace = properties => {
-        if (properties.items.length > 0) {
-            onSelectTraceAux(properties.items[0]);
-        } else {
-            clearTraceDetails();
-            clearHighlightTraces(itemsDataSet);
-        }
-    };
-
-    const focusOnTrace = properties => {
-        if (properties.what === 'item') {
-            const selectedItem = itemsDataSet.get(properties.item);
-            if (selectedItem) {
-                timeline.focus(selectedItem.id);
-            }
-        }
-    };
-
     const createDetails = (field, value) => `<tr><th>${field}:</th> <td>${value}</td></tr>`;
 
     const showTraceDetails = trace => {
@@ -261,14 +216,6 @@ function createTimeline(data) {
         itemsDataSet.update(highlightedItems);
     };
 
-    const onSelectTraceAux = id => {
-        const selectedItem = itemsDataSet.get(id);
-        if (selectedItem) {
-            highlightTraces(selectedItem);
-            showTraceDetails(selectedItem);
-        }
-    };
-    
     const move = percentage => {
         const range = timeline.getWindow();
         const interval = range.end - range.start;
@@ -276,6 +223,15 @@ function createTimeline(data) {
             start: range.start.valueOf() - interval * percentage,
             end: range.end.valueOf() - interval * percentage
         });
+    };
+
+
+    const onSelectTraceAux = id => {
+        const selectedItem = itemsDataSet.get(id);
+        if (selectedItem) {
+            highlightTraces(selectedItem.id);
+            showTraceDetails(selectedItem);
+        }
     };
 
 
@@ -348,6 +304,7 @@ function createTimeline(data) {
         isRightMouseDown = false;
     });
 
+    
     timeline.on('select', function (properties) {
         if (properties.items.length > 0) {
             onSelectTraceAux(properties.items[0]);
@@ -361,7 +318,7 @@ function createTimeline(data) {
         if (properties.what === 'item') {
             const selectedItem = itemsDataSet.get(properties.item);
             if (selectedItem) {
-                timeline.setSelection(selectedItem.id, { focus: true });
+                timeline.focus(selectedItem.id);
             }
         }
     });
