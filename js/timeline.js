@@ -26,13 +26,14 @@ function prettyPrint(obj, indentLevel = 0) {
         }
       } else {
         html += `<div class="${indentClass}"><span class="key">${key}</span> = {<div class="indent">`;
-        html += prettyPrint(field, indentLevel + 1); // Recurse for other nested objects
+        html += prettyPrint(field, indentLevel + 1); 
         html += `</div>}</div>`;
       }
     }
   }
   return html;
 }
+
 
 /*
  * Get options array for the timeline instance.
@@ -49,11 +50,11 @@ function getTimelineOptions(minStart, maxEnd) {
               let tooltip = `<div><strong>${trace.content}</strong><br>`;
               if (trace.traceData._event_kind === "DISPATCH") {
                 tooltip += `<strong>Event Dispatched:</strong> ${trace.traceData._event_name} (${trace.traceData._event_id})<br>` +
-                           `<strong>Dispatch Time:</strong> ${trace.traceData._event_dispatch_time}`;
+                           `<strong>Dispatch Time:</strong> ${normalizeTime(trace.traceData._event_dispatch_time)}`;
               } else {
                 tooltip += `<strong>ID:</strong> ${trace.id}<br>` +
                            `<strong>CID:</strong> ${trace.corr_id}<br>` +
-                           `<strong>Duration:</strong> ${trace.traceData.dur} ns<br>`;
+                           `<strong>Duration:</strong> ${convertTime(trace.traceData.dur, true)}<br>`;
               }
               tooltip += "</div>";
               return tooltip;
@@ -69,13 +70,15 @@ function getTimelineOptions(minStart, maxEnd) {
           if (!group) return;
           var container = document.createElement("div");
           if (group.treeLevel == 1) {
-              var iconDiv = document.createElement("div");
+              var iconDiv       = document.createElement("div");
               iconDiv.className = "domain-tooltip";
-              var infoIcon = document.createElement("img");
-              infoIcon.src = "assets/icons/information.png";
-              infoIcon.style.width = "11px";
-              infoIcon.style.height = "11px";
+
+              var infoIcon      = document.createElement("img");
+              infoIcon.src      = "assets/icons/information.png";
+              infoIcon.style.width        = "11px";
+              infoIcon.style.height       = "11px";
               infoIcon.style.paddingRight = "5px";
+
               var tooltipText = document.createElement("span");
               tooltipText.className = "tooltiptext";
               tooltipText.innerHTML = group.desc;
@@ -123,103 +126,57 @@ function createTimeline(data) {
 
     const timeline = new vis.Timeline(container, itemsDataSet, groupsDataSet, options);
 
-    const move = percentage => {
-        const range = timeline.getWindow();
-        const interval = range.end - range.start;
-        timeline.setWindow({
-            start: range.start.valueOf() - interval * percentage,
-            end: range.end.valueOf() - interval * percentage
-        });
-    };
-
-    const onSelectTraceAux = id => {
-        const selectedItem = itemsDataSet.get(id);
-        if (selectedItem) {
-            highlightTraces(selectedItem);
-            showTraceDetails(selectedItem);
-        }
-    };
-
-    const gotoTrace = () => {
-        const id = parseInt(document.getElementById("id_input").value.trim(), 10);
-        if (!isNaN(id)) {
-            timeline.setSelection(id, { focus: true });
-            onSelectTraceAux(id);
-        } else {
-            alert("Please enter a valid Trace ID.");
-        }
-    };
-
-    const onSelectTrace = properties => {
-        if (properties.items.length > 0) {
-            onSelectTraceAux(properties.items[0]);
-        } else {
-            clearTraceDetails();
-            clearHighlightTraces();
-        }
-    };
-
-    const focusOnTrace = properties => {
-        if (properties.what === 'item') {
-            const selectedItem = itemsDataSet.get(properties.item);
-            if (selectedItem) {
-                timeline.setSelection(selectedItem.id, { focus: true });
-            }
-        }
-    };
-
     const createDetails = (field, value) => `<strong>${field}:</strong> ${value}<br>`;
 
     const showTraceDetails = trace => {
         const traceInfo = document.getElementById('trace-info');
         const traceData = trace.traceData || {};
-        const traceArgs = traceData.args || {};
+        const traceArgs = traceData.args  || {};
         const commonDetails = [];
         const domainSpecificDetails = [];
-
-        commonDetails.push(createDetails("Name", trace.content));
-        if (traceData._event_kind === "DISPATCH") {
-            commonDetails.push(createDetails("Event Dispatched", `${traceData._event_name} (${traceData._event_id})`));
-            commonDetails.push(createDetails("Dispatch Time", trace.start));
-        } else {
-            commonDetails.push(createDetails("ID", trace.id));
-            commonDetails.push(createDetails("CID", trace.corr_id));
-            commonDetails.push(createDetails("Duration", `${traceData.dur || 'N/A'} ns`));
-            commonDetails.push(createDetails("Start Time", trace.start));
-            commonDetails.push(createDetails("End Time", trace.end));
-        }
-
+        
         const append = (details, field, value) => details.push(createDetails(field, value));
 
+        append(commonDetails, "Name", trace.content);
+        if (traceData._event_kind === "DISPATCH") {
+                append(commonDetails, "Event Dispatched", `${traceData._event_name} (${traceData._event_id})`);
+                append(commonDetails, "Dispatch Time",    normalizeTime(traceData._event_dispatch_time));
+        } else {
+                append(commonDetails, "ID",         trace.id);
+                append(commonDetails, "CID",        trace.corr_id);
+                append(commonDetails, "Duration",   convertTime(traceData.dur, true) || 'N/A');
+                append(commonDetails, "Start Time", normalizeTime(traceData.start));
+                append(commonDetails, "End Time",   normalizeTime(traceData.end));
+        }
         const domainHandlers = {
             CPU: () => {
-                append(commonDetails, "Process ID", traceData.pid);
-                append(commonDetails, "Thread ID", traceData.tid);
-                append(domainSpecificDetails, "Data", prettyPrint(traceArgs));
+                append(commonDetails,         "Process ID",   traceData.pid);
+                append(commonDetails,         "Thread ID",    traceData.tid);
+                append(domainSpecificDetails, "Data",         prettyPrint(traceArgs));
             },
             KERNEL: () => {
-                append(commonDetails, "Dispatch Time", traceArgs.dispatch_time);
-                append(domainSpecificDetails, "GPU Node ID", `${traceData._event_node_id} (${traceArgs.gpu_id})`);
-                append(domainSpecificDetails, "Queue ID", traceArgs.queue_id);
-                append(domainSpecificDetails, "Block Dimension", `[${traceArgs.wrg.join(", ")}]`);
-                append(domainSpecificDetails, "Grid Dimension", `[${traceArgs.grd.join(", ")}]`);
-                append(domainSpecificDetails, "Private Segment Size", traceArgs.private_segment_size);
-                append(domainSpecificDetails, "Group Segment Size", traceArgs.group_segment_size);
-                append(domainSpecificDetails, "Kernel Handle", traceArgs.kernel_object);
-                append(domainSpecificDetails, "Kernel Arg Addr", traceArgs.kernarg_address);
-                append(domainSpecificDetails, "Completion Signal", traceData.sig);
+                append(commonDetails,         "Dispatch Time",          normalizeTime(traceArgs.dispatch_time));
+                append(domainSpecificDetails, "GPU Node ID",            `${traceData._event_node_id} (${traceArgs.gpu_id})`);
+                append(domainSpecificDetails, "Queue ID",               traceArgs.queue_id);
+                append(domainSpecificDetails, "Block Dimension",        `[${traceArgs.wrg.join(", ")}]`);
+                append(domainSpecificDetails, "Grid Dimension",         `[${traceArgs.grd.join(", ")}]`);
+                append(domainSpecificDetails, "Private Segment Size",   traceArgs.private_segment_size);
+                append(domainSpecificDetails, "Group Segment Size",     traceArgs.group_segment_size);
+                append(domainSpecificDetails, "Kernel Handle",          traceArgs.kernel_object);
+                append(domainSpecificDetails, "Kernel Arg Addr",        traceArgs.kernarg_address);
+                append(domainSpecificDetails, "Completion Signal",      traceData.sig);
             },
             BARRIER: () => {
-                append(commonDetails, "Dispatch Time", traceArgs.dispatch_time);
-                append(domainSpecificDetails, "GPU Node ID", `${traceData._event_node_id} (${traceArgs.gpu_id})`);
-                append(domainSpecificDetails, "Queue ID", traceArgs.queue_id);
-                append(domainSpecificDetails, "Completion Signal", traceData.sig);
+                append(commonDetails,         "Dispatch Time",      normalizeTime(traceArgs.dispatch_time));
+                append(domainSpecificDetails, "GPU Node ID",        `${traceData._event_node_id} (${traceArgs.gpu_id})`);
+                append(domainSpecificDetails, "Queue ID",           traceArgs.queue_id);
+                append(domainSpecificDetails, "Completion Signal",  traceData.sig);
             },
             MEMORY: () => {
-                append(domainSpecificDetails, "Source", `${traceData._copy_src_kind} Node ID. ${traceData._copy_src_node_id} (${traceArgs.src_agent})`);
-                append(domainSpecificDetails, "Destination", `${traceData._copy_dst_kind} Node ID. ${traceData._copy_dst_node_id} (${traceArgs.dst_agent})`);
-                append(domainSpecificDetails, "Size transferred", `${traceArgs.size} bytes`);
-                append(domainSpecificDetails, "Completion Signal", traceData.sig);
+                append(domainSpecificDetails, "Source",             `${traceData._copy_src_kind} Node ID. ${traceData._copy_src_node_id} (${traceArgs.src_agent})`);
+                append(domainSpecificDetails, "Destination",        `${traceData._copy_dst_kind} Node ID. ${traceData._copy_dst_node_id} (${traceArgs.dst_agent})`);
+                append(domainSpecificDetails, "Size transferred",   convertBytes(traceArgs.size));
+                append(domainSpecificDetails, "Completion Signal",  traceData.sig);
             }
         };
 
@@ -252,14 +209,109 @@ function createTimeline(data) {
         itemsDataSet.update(highlightedItems);
     };
 
-    // Attach navigation and event handlers
-    document.getElementById("zoomIn").onclick = () => timeline.zoomIn(0.2);
-    document.getElementById("zoomOut").onclick = () => timeline.zoomOut(0.2);
-    document.getElementById("moveLeft").onclick = () => move(0.2);
-    document.getElementById("moveRight").onclick = () => move(-0.2);
-    document.getElementById("goto").onclick = () => gotoTrace();
+    const onSelectTraceAux = id => {
+        const selectedItem = itemsDataSet.get(id);
+        if (selectedItem) {
+            highlightTraces(selectedItem);
+            showTraceDetails(selectedItem);
+        }
+    };
+    
+    const move = percentage => {
+        const range = timeline.getWindow();
+        const interval = range.end - range.start;
+        timeline.setWindow({
+            start: range.start.valueOf() - interval * percentage,
+            end: range.end.valueOf() - interval * percentage
+        });
+    };
 
-    timeline.on('select', onSelectTrace);
-    timeline.on('doubleClick', focusOnTrace);
+
+    // Attach navigation and event handlers
+    document.getElementById("zoomIn").onclick = () => timeline.zoomIn(0.3);
+    document.getElementById("zoomOut").onclick = () => timeline.zoomOut(0.3);
+
+    document.getElementById("moveLeft").onclick = () => move(0.3);
+    document.getElementById("moveRight").onclick = () => move(-0.3);
+
+    document.getElementById("goto").onclick = () => {
+        const id = parseInt(document.getElementById("id_input").value.trim(), 10);
+        if (!isNaN(id)) {
+            timeline.setSelection(id, { focus: true });
+            onSelectTraceAux(id);
+        } else {
+            alert("Please enter a valid Trace ID.");
+        }
+    };
+    
+    let isRightMouseDown = false;
+    let startTime = null;
+    let timeMarkerId = "time_marker_id";
+    let tempItem = null;
+
+    timeline.on('contextmenu', function (properties) {
+        properties.event.preventDefault();
+    });
+
+    timeline.on('mouseDown', function (properties) {
+        if (properties.event.button === 2 ) {
+            itemsDataSet.remove(timeMarkerId);
+            if (properties.what == 'background' && properties.time) {
+                isRightMouseDown = true;
+                startTime = properties.time;
+                tempItem = {
+                    id: timeMarkerId,
+                    type: "background",
+                    start: startTime,
+                    end: startTime
+                };
+            }
+        }
+    });
+
+    timeline.on('mouseMove', function (properties) {
+        if (isRightMouseDown && properties.time) {
+            let existingItem = itemsDataSet.get(tempItem.id);
+            if (existingItem) {
+                itemsDataSet.update({ 
+                    id: timeMarkerId, 
+                    content: convertTime(properties.time - startTime), 
+                    end: properties.time });
+            } else {
+                itemsDataSet.add(tempItem);
+            }
+        }
+    });
+
+    timeline.on('mouseUp', function (properties) {
+        if (isRightMouseDown && properties.time) {
+            let existingItem = itemsDataSet.get(tempItem.id);
+            if (existingItem) {
+                itemsDataSet.update({ 
+                    id: timeMarkerId, 
+                    content: convertTime(properties.time - startTime), 
+                    end: properties.time });
+            }
+        }
+        isRightMouseDown = false;
+    });
+
+    timeline.on('select', function (properties) {
+        if (properties.items.length > 0) {
+            onSelectTraceAux(properties.items[0]);
+        } else {
+            clearTraceDetails();
+            clearHighlightTraces();
+        }
+    });
+
+    timeline.on('doubleClick', function (properties) {
+        if (properties.what === 'item') {
+            const selectedItem = itemsDataSet.get(properties.item);
+            if (selectedItem) {
+                timeline.setSelection(selectedItem.id, { focus: true });
+            }
+        }
+    });
     return timeline;
 }

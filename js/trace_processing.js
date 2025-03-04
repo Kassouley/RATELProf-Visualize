@@ -1,27 +1,20 @@
-function hashStringToLightColor(str) {
-  // Simple hash function to generate a color
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+function normalizerClosure(normalizer) {
+  return function (time) {
+    return convertTime(time - normalizer, true);
   }
-  
-  // Convert hash to a light hexadecimal color
-  let color = "#";
-  for (let i = 0; i < 3; i++) {
-      const value = ((hash >> (i * 8)) & 0xFF); // Extract 8 bits
-      const lightValue = Math.floor((value / 2) + 127); // Ensure the value is in the light range (127–255)
-      color += ("00" + lightValue.toString(16)).slice(-2);
-  }
-  
-  return color;
 }
+
+let normalizeTime = null;
 
 function processTraces(data) {
   const traceEvents = data.trace_events;
   const lcEvents = data.lifecycle;
   const domainIDs = data.domain_id;
   const nodeIDs = data.node_id;
+
+  normalizeTime = normalizerClosure(lcEvents.constructor_start);
   // const phaseIDs = data.phase_id;
+
   const items = [];
   const groups = [];
   const groupsTmp = {};
@@ -85,6 +78,9 @@ function processTraces(data) {
       if (traceDomain === 17) {
         event._event_name = event.args?.kernel_name || "N/A";
         event._event_kind = "KERNEL";
+        for (let i = 0; i < 3; i++) {
+          event.args.grd[i] = event.args.grd[i] / event.args.wrg[i];
+        }
       } else if (traceDomain === 18) {
         event._event_name = "Barrier Or";
         event._event_kind = "BARRIER";
@@ -128,15 +124,15 @@ function processTraces(data) {
 
       if ([17, 18, 19].includes(event.d)) {
         items.push({
-          className: 'non-highlighted',
-          style: 'background-color: '+hashStringToLightColor("Dispatch"),
-          id: `Dispatch_${event.id}`,
-          corr_id: event.id,
-          content: "Dispatch",
-          subgroup: event._subgroup_id,
-          start: event.args.dispatch_time / 1000,
-          end: (event.args.dispatch_time + 1000) / 1000,
-          group: event._nested_group_id,
+          className:  'non-highlighted',
+          style:      'background-color: '+hashStringToLightColor("Dispatch"),
+          id:         `Dispatch_${event.id}`,
+          corr_id:    event.id,
+          content:    "Dispatch",
+          subgroup:   event._subgroup_id,
+          start:      event.args.dispatch_time / 1000,
+          end:        (event.args.dispatch_time + 1000) / 1000,
+          group:      event._nested_group_id,
           traceData: {
             _event_name: event._event_name,
             _event_kind: "DISPATCH",
