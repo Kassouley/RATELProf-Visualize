@@ -1,5 +1,5 @@
 function prettyPrint(obj, indentLevel = 0) {
-    let html = '';
+  let html = '';
   const indentClass = 'indent'.repeat(indentLevel);
 
   for (const key in obj) {
@@ -39,7 +39,9 @@ function prettyPrint(obj, indentLevel = 0) {
  * Get options array for the timeline instance.
  * See "https://visjs.github.io/vis-timeline/docs/timeline/" for more details.
  */
-function getTimelineOptions(minStart, maxEnd) {
+function getTimelineOptions(traceProcessor) {
+    const minStart = traceProcessor.minStart; 
+    const maxEnd   = traceProcessor.maxEnd;
     return {
         showCurrentTime: false,
         showMajorLabels: false,
@@ -49,11 +51,11 @@ function getTimelineOptions(minStart, maxEnd) {
             template: trace => {
               let tooltip = `<div><strong>${trace.content}</strong><br>`;
               if (trace.traceData._event_kind === "DISPATCH") {
-                tooltip += `<strong>Event Dispatched:</strong> ${trace.traceData._event_name} (${trace.traceData._event_id})<br>` +
-                           `<strong>Dispatch Time:</strong> ${normalizeTime(trace.traceData._event_dispatch_time)}`;
+                tooltip += `<strong>Event Dispatched:</strong> ${trace.traceData.dispatched_event} (${trace.traceData.corr_id})<br>` +
+                           `<strong>Dispatch Time:</strong> ${traceProcessor.normalizeTime(trace.traceData.dispatch_time)}`;
               } else {
                 tooltip += `<strong>ID:</strong> ${trace.id}<br>` +
-                           `<strong>CID:</strong> ${trace.corr_id}<br>` +
+                           `<strong>CID:</strong> ${trace.traceData.corr_id}<br>` +
                            `<strong>Duration:</strong> ${convertTime(trace.traceData.dur, true)}<br>`;
               }
               tooltip += "</div>";
@@ -115,15 +117,12 @@ function getTimelineOptions(minStart, maxEnd) {
     };
 }
 
-function createTimeline(data) {
-    const { items, groups, minStart, maxEnd } = processTraces(data);
-    const container = document.getElementById("timeline");
-    const itemsDataSet = new vis.DataSet(items);
-    const groupsDataSet = new vis.DataSet(groups);
-
-    const options = getTimelineOptions(minStart, maxEnd);
-
-    const timeline = new vis.Timeline(container, itemsDataSet, groupsDataSet, options);
+function createTimeline(traceProcessor) {
+    const container      = document.getElementById("timeline");
+    const options        = getTimelineOptions(traceProcessor);
+    const itemsDataSet   = new vis.DataSet(traceProcessor.items);
+    const groupsDataSet  = new vis.DataSet(traceProcessor.groups);
+    const timeline       = new vis.Timeline(container, itemsDataSet, groupsDataSet, options);
 
     const createDetails = (field, value) => `<tr><th>${field}:</th> <td>${value}</td></tr>`;
 
@@ -138,14 +137,14 @@ function createTimeline(data) {
 
         append(commonDetails, "Name", trace.content);
         if (traceData._event_kind === "DISPATCH") {
-                append(commonDetails, "Event Dispatched", `${traceData._event_name} (${traceData._event_id})`);
-                append(commonDetails, "Dispatch Time",    normalizeTime(traceData._event_dispatch_time));
+                append(commonDetails, "Event Dispatched", `${traceData.dispatched_event} (${traceData.corr_id})`);
+                append(commonDetails, "Dispatch Time",    traceProcessor.normalizeTime(traceData.dispatch_time));
         } else {
                 append(commonDetails, "ID",         trace.id);
-                append(commonDetails, "CID",        trace.corr_id);
+                append(commonDetails, "CID",        traceData.corr_id);
                 append(commonDetails, "Duration",   convertTime(traceData.dur, true) || 'N/A');
-                append(commonDetails, "Start Time", normalizeTime(traceData.start));
-                append(commonDetails, "End Time",   normalizeTime(traceData.end));
+                append(commonDetails, "Start Time", traceProcessor.normalizeTime(traceData.start));
+                append(commonDetails, "End Time",   traceProcessor.normalizeTime(traceData.end));
         }
         const domainHandlers = {
             CPU: () => {
@@ -154,8 +153,8 @@ function createTimeline(data) {
                 append(domainSpecificDetails, "Data",         prettyPrint(traceArgs));
             },
             KERNEL: () => {
-                append(commonDetails,         "Dispatch Time",          normalizeTime(traceArgs.dispatch_time));
-                append(domainSpecificDetails, "GPU Node ID",            `${traceData._event_node_id} (${traceArgs.gpu_id})`);
+                append(commonDetails,         "Dispatch Time",          traceProcessor.normalizeTime(traceArgs.dispatch_time));
+                append(domainSpecificDetails, "GPU Node ID",            `${traceProcessor.getNodeIdFromAgent(traceArgs.gpu_id)} (${traceArgs.gpu_id})`);
                 append(domainSpecificDetails, "Queue ID",               traceArgs.queue_id);
                 append(domainSpecificDetails, "Block Dimension",        `[${traceArgs.wrg.join(", ")}]`);
                 append(domainSpecificDetails, "Grid Dimension",         `[${traceArgs.grd.join(", ")}]`);
@@ -166,14 +165,14 @@ function createTimeline(data) {
                 append(domainSpecificDetails, "Completion Signal",      traceData.sig);
             },
             BARRIER: () => {
-                append(commonDetails,         "Dispatch Time",      normalizeTime(traceArgs.dispatch_time));
-                append(domainSpecificDetails, "GPU Node ID",        `${traceData._event_node_id} (${traceArgs.gpu_id})`);
+                append(commonDetails,         "Dispatch Time",      traceProcessor.normalizeTime(traceArgs.dispatch_time));
+                append(domainSpecificDetails, "GPU Node ID",        `${traceProcessor.getNodeIdFromAgent(traceArgs.gpu_id)} (${traceArgs.gpu_id})`);
                 append(domainSpecificDetails, "Queue ID",           traceArgs.queue_id);
                 append(domainSpecificDetails, "Completion Signal",  traceData.sig);
             },
             MEMORY: () => {
-                append(domainSpecificDetails, "Source",             `${traceData._copy_src_kind} Node ID. ${traceData._copy_src_node_id} (${traceArgs.src_agent})`);
-                append(domainSpecificDetails, "Destination",        `${traceData._copy_dst_kind} Node ID. ${traceData._copy_dst_node_id} (${traceArgs.dst_agent})`);
+                append(domainSpecificDetails, "Source",             `${traceProcessor.getMemKind(traceArgs.src_type)} Node ID. ${traceProcessor.getNodeIdFromAgent(traceArgs.src_agent)} (${traceArgs.src_agent})`);
+                append(domainSpecificDetails, "Destination",        `${traceProcessor.getMemKind(traceArgs.dst_type)} Node ID. ${traceProcessor.getNodeIdFromAgent(traceArgs.dst_agent)} (${traceArgs.dst_agent})`);
                 append(domainSpecificDetails, "Size transferred",   convertBytes(traceArgs.size));
                 append(domainSpecificDetails, "Completion Signal",  traceData.sig);
             }
@@ -204,7 +203,7 @@ function createTimeline(data) {
     const highlightTraces = selectedItemId => {
         clearHighlightTraces();
 
-        const matchingItems = itemsDataSet.get().filter(item => item.corr_id === selectedItemId);
+        const matchingItems = itemsDataSet.get().filter(item => item.traceData?.corr_id === selectedItemId);
         if (matchingItems.length === 0) return;
 
         highlightedOriginalItems.push(...matchingItems);
@@ -304,7 +303,6 @@ function createTimeline(data) {
         isRightMouseDown = false;
     });
 
-    
     timeline.on('select', function (properties) {
         if (properties.items.length > 0) {
             onSelectTraceAux(properties.items[0]);

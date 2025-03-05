@@ -8,7 +8,8 @@ async function loadTraceDataFromFile(file) {
         console.log("Finished.");
 
         console.log("Timeline Creation...");
-        timelineObject = createTimeline(data);
+        const traceProcessor = new TraceProcessor(data);
+        timelineObject = createTimeline(traceProcessor);
         console.log("Finished.");
     } catch (error) {
         alert('Error loading trace data: ' + error.message);
