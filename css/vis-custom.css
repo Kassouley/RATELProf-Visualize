@@ -10,12 +10,17 @@
 .vis-item.vis-selected {
     box-sizing: border-box;
     border: 0px;
-    outline: 2px solid var(--selected-color);
+    outline: 3px solid var(--selected-color);
 }
   
 .vis-item.vis-point.vis-selected {
     background-color: rgba(0, 0, 0, 0);
     border: 0px;
+    outline: 0px;
+}
+
+.vis-item.vis-dot{
+    border-width:3px;
 }
 
 .vis-tooltip {

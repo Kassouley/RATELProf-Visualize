@@ -1,9 +1,9 @@
 class TraceProcessor {
   constructor(data) {
-    this.traceEvents = data.trace_events;
-    this.lcEvents = data.lifecycle;
-    this.domainIDs = data.domain_id;
-    this.nodeIDs = data.node_id;
+    this.traceEvents = data.trace_events || {};
+    this.lcEvents = data.lifecycle || {};
+    this.domainIDs = data.domain_id || {};
+    this.nodeIDs = data.node_id || {};
 
     this.groups = [];
 
@@ -49,162 +49,175 @@ class TraceProcessor {
   };
 
   getDomainNameFromId(traceDomain) {
+    if (traceDomain == 99) { return "DISPATCH" } 
     return this.domainIDs[traceDomain]?.name.replace("RATELPROF_", "").replaceAll("_", " ") || "Unknown Domain"
   };
 
   getDomainDescFromId(traceDomain) {
+    if (traceDomain == 99) { return "Dispatch" } 
     return this.domainIDs[traceDomain]?.desc || "Unknown Domain"
   };
 
   processTraces() {
-    const groupsTmp = [];
-    const idMap     = new Map();
-    const depthMap  = new Map();
-
-    const computeDepth = (event) => {
-        if (depthMap.has(event.id)) return depthMap.get(event.id);
-        if (!event.corr_id || !idMap.has(event.corr_id)) return 1;
-
-        const depth = 1 + computeDepth(idMap.get(event.corr_id));
-        depthMap.set(event.id, depth);
-        return depth
+    const computeDepth = (event, id) => {
+      if (depthMap.has(id)) return depthMap.get(id);
+      if (!event.corr_id || !(event.corr_id in tracesList)) return 1;
+    
+      const depth = 1 + computeDepth(tracesList[event.corr_id], event.corr_id);
+      depthMap.set(id, depth);
+      return depth;
     };
 
-    const preprocessTraceEvents = (event) => {
-      const groupInfo = [];
-      let eventName = "N/A";
-      const traceDomain = event.d;
-      if ([17, 18, 19].includes(traceDomain)) {
-        if (traceDomain === 17) {
-          eventName = event.args.kernel_name || "N/A";
-          event._event_kind = "KERNEL";
-          for (let i = 0; i < 3; i++) {
-            event.args.grd[i] = event.args.grd[i] / event.args.wrg[i]
-          }
-        } else if (traceDomain === 18) {
-          eventName = "BarrierOr";
-          event._event_kind = "BARRIER"
-        } else if (traceDomain === 19) {
-          eventName = "BarrierAnd";
-          event._event_kind = "BARRIER"
-        }
-        groupInfo._nested_group_id   = `${traceDomain}_${event.args.gpu_id}`;
-        groupInfo._nested_group_name = `GPU Node ID. ${this.getNodeIdFromAgent(event.args.gpu_id)}`;
-        groupInfo._subgroup_id       = event.args.queue_id || 1
-      } else if (traceDomain === 16) {
-        eventName = `Copy${this.getMemKind(event.args.src_type)}To${this.getMemKind(event.args.dst_type)}`;
-        event._event_kind = "MEMORY";
-        groupInfo._nested_group_id   = `${traceDomain}_${eventName}`;
-        groupInfo._nested_group_name =eventName;
-        groupInfo._subgroup_id       = 1
-      } else {
-        eventName = event.name;
-        event._event_kind = "CPU";
-        groupInfo._nested_group_id   = `${traceDomain}_${event.tid}`;
-        groupInfo._nested_group_name = `TID. ${event.tid}`;
-        groupInfo._subgroup_id       = computeDepth(event)
-      }
+    const idMap = new Map();
+    const depthMap = new Map();
+    const groupsList = {};
+    const tracesList = {};
+    
+    Object.entries(this.traceEvents).forEach(([id, events]) => {
+      groupsList[id] = {
+        group: {
+          className:  "lvl1-group-class",
+          style:      "color:var(--text-color);background-color:var(--lvl1-group-color);font-size:13px;text-align:left;",
+          treeLevel:  1,
+          id:         id,
+          content:    this.getDomainNameFromId(id),
+          desc:       this.getDomainDescFromId(id),
+          showNested: id < 5 ? false : true,
+          value:      id < 5 ? id + 100 : id,
+          nestedGroups: [],
+        },
+        nested_groups: {}
+      };
+    
+      Object.assign(tracesList, events);
+    });
+    
+    Object.entries(this.traceEvents).forEach(([domain, events]) => {
+      Object.entries(events).forEach(([id, event]) => {
+        const { nestedGroupKey: groupId, eventName, subgroup } = preprocessTraceEvents(event, id, domain);
 
-      return {groupInfo, eventName}
-    };
-
-    const createItemsDataset = () => {
-      this.traceEvents.forEach(event => {
-        idMap.set(event.id, event)
-      });
-      this.traceEvents.forEach((event) => {
-        const { groupInfo, eventName } = preprocessTraceEvents(event);
         if (event.start < this.minStart) this.minStart = event.start;
         if (event.end   > this.maxEnd)   this.maxEnd   = event.end;
 
-        if ([17, 18, 19].includes(event.d)) {
-          this.items.push({
+        this.items.push({
+          className: 'non-highlighted',
+          style:     'background-color:'+hashStringToLightColor(eventName),
+          id:        id,
+          content:   eventName,
+          start:     Math.round(event.start / 1000),
+          end:       Math.round((event.end + 1000) / 1000),
+          group:     groupId,
+          subgroup:  subgroup,
+          limitSize: true,
+          traceData: event,
+        })
+      })
+    });
+
+
+    const createNestedGroup = (parentGroup, id, content, value, treeLevel) => {
+      if (!parentGroup.nested_groups[id]) {
+        parentGroup.nested_groups[id] = {
+          group: {
+            className: "lvl-last-group-class",
+            style: "color:var(--text-color);font-size:12px;text-align:right;background-color:var(--lvl-last-group-color)",
+            id,
+            content,
+            value,
+            treeLevel,
+          },
+          nested_groups: {},
+        };
+        if (!parentGroup.group.nestedGroups) {
+          parentGroup.group.nestedGroups = [];
+          parentGroup.group.style = parentGroup.group.style.replace("last", "mid");
+          parentGroup.group.className = parentGroup.group.className.replace("last", "mid")
+        }
+        parentGroup.group.nestedGroups.push(id); 
+      }
+      return parentGroup.nested_groups[id];
+    };
+
+
+    const preprocessTraceEvents = (event, id, traceDomain) => {
+      let eventName = "N/A";
+      let subgroup = 1;
+
+      let domainGroup = groupsList[traceDomain];
+
+      let nestedGroupKey, nestedGroupName;
+      if ([5, 6, 7].includes(traceDomain)) {
+        if (traceDomain === 5) {
+          eventName = event.args.kernel_name || "N/A";
+          event._event_kind = "KERNEL";
+        } else if (traceDomain === 6) {
+          eventName = "BarrierAnd";
+          event._event_kind = "BARRIER";
+        } else {
+          eventName = "BarrierOr";
+          event._event_kind = "BARRIER";
+        }
+
+        nestedGroupKey  = `${traceDomain}_${event.args.gpu_id}`;
+        nestedGroupName = `GPU Node ID. ${this.getNodeIdFromAgent(event.args.gpu_id)}`;
+
+        const nestedGroup = createNestedGroup(domainGroup, nestedGroupKey, nestedGroupName, event.args.gpu_id, 2);
+
+        nestedGroupKey  = `${traceDomain}_${event.args.gpu_id}_${event.args.queue_id}`;
+        nestedGroupName = `Queue ID. ${event.args.queue_id}`;
+
+        createNestedGroup(nestedGroup, nestedGroupKey, nestedGroupName, event.args.queue_id, 3);
+
+        this.items.push({
             className:  'non-highlighted',
-            style:      'background-color: '+hashStringToLightColor("Dispatch"),
-            id:         `Dispatch_${event.id}`,
-            content:    "Dispatch",
+            id:         `Dispatch_${id}`,
             start:      event.args.dispatch_time / 1000,
-            end:        (event.args.dispatch_time + 1000) / 1000,
-            group:      groupInfo._nested_group_id,
-            subgroup:   groupInfo._subgroup_id,
+            type:       "point",
+            group:      nestedGroupKey,
             traceData: {
-              corr_id: event.id,
+              corr_id: id,
               dispatched_event: eventName,
               dispatch_time: event.args.dispatch_time,
               _event_kind: "DISPATCH"
+        }});
+
+
+      } else if (traceDomain === 4) {
+        eventName = `Copy${this.getMemKind(event.args.src_type)}To${this.getMemKind(event.args.dst_type)}`;
+        event._event_kind = "MEMORY";
+
+        nestedGroupKey   = `${traceDomain}_${event.args.engine_id}`;
+        nestedGroupName  = `SDMA ID. ${(event.args.engine_id == -1) ? "Unknown" : event.args.engine_id}`;
+        
+        createNestedGroup(domainGroup, nestedGroupKey, nestedGroupName, event.args.engine_id, 2);
+
+      } else {
+        eventName = event.name;
+        event._event_kind = "CPU";
+        
+        nestedGroupKey     = `${traceDomain}_${event.tid}`;
+        nestedGroupName    = `TID. ${event.tid}`;
+        
+        createNestedGroup(domainGroup, nestedGroupKey, nestedGroupName, event.tid, 2);
+        subgroup = computeDepth(event, id);
+      }
+      return {nestedGroupKey, eventName, subgroup}
+    };
+
+    function concatGroups(groupsList) {
+      let result = [];
+      for (const key in groupsList) {
+          if (groupsList.hasOwnProperty(key)) {
+              const group = groupsList[key];
+              result.push(group.group);
+              if (group.nested_groups && typeof group.nested_groups === 'object') {
+                result = result.concat(concatGroups(group.nested_groups));
+              }
           }
-          });
-        }
+      }
+      return result;
+   }
 
-        this.items.push({
-          className: 'non-highlighted',
-          style:     'background-color: '+hashStringToLightColor(eventName),
-          id:        event.id,
-          content:   eventName,
-          start:     Math.round(event.start / 1000),
-          end:       Math.round(event.end / 1000),
-          group:     groupInfo._nested_group_id,
-          subgroup:  groupInfo._subgroup_id,
-          limitSize: true,
-          traceData: event,
-        });
-
-        const eventDomain = event.d;
-        const groupId = groupInfo._nested_group_id;
-
-        if (!groupsTmp[eventDomain]) {
-          groupsTmp[eventDomain] = [];
-        }
-
-        const groupList = groupsTmp[eventDomain];
-        let targetGroup = groupList.find(group => group.id === groupId);
-
-        if (!targetGroup) {
-          targetGroup = {
-            style: "color: var(--text-color); background-color: var(--secondary-tl); font-size: 13px; text-align: right; border-color: var(--border-color);",
-            id: groupId,
-            content: groupInfo._nested_group_name,
-            value: eventDomain,
-            treeLevel: 2,
-            totalDuration: 0,
-            isGpuGroup: event._event_kind !== "CPU"
-          };
-          groupList.push(targetGroup)
-        }
-
-        targetGroup.totalDuration += event.dur;
-      })
-    };
-
-    const createGroupsDataset = () => {
-      let gpuCounter = 1; // Start GPU counter from the smallest value
-      let cpuCounter = Object.entries(groupsTmp).length; // Start CPU counter from the largest value
-
-      Object.entries(groupsTmp).forEach(([traceDomain, nestedGroups]) => {
-        let isGPU = nestedGroups[0].isGpuGroup;
-        // if (isGPU) {
-        //   nestedGroups.forEach(nestedGroup => {
-        //     const percent = (nestedGroup.totalDuration/main_duration)*100;
-        //     nestedGroup.content = nestedGroup.content+"<div style=\"font-size: 9px\">GPU USAGE: "+percent.toFixed(2)+"%";
-        //   });
-        // };
-        this.groups.push(...nestedGroups);
-        this.groups.push({
-          className:      "groupClass",
-          style:          "color: var(--text-color); background-color: var(--primary-tl); font-size: 13px; text-align: left; border-color: var(--border-color)",
-          treeLevel:      1,
-          id:             traceDomain,
-          content:        this.getDomainNameFromId(traceDomain),
-          desc:           this.getDomainDescFromId(traceDomain),
-          value:          isGPU ? gpuCounter++ : cpuCounter--,
-          subgroupStack:  true,
-          showNested:     isGPU,
-          nestedGroups:   nestedGroups.map((group) => group.id),
-        })
-      })
-    };
-
-    createItemsDataset();
-    createGroupsDataset();
+    this.groups = concatGroups(groupsList);
   }
 }

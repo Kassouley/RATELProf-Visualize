@@ -60,6 +60,11 @@ function convertTime(time, isNanosecond = false) {
         result.push(`${microseconds} µs`);
         if (nanoseconds > 0) result.push(`${nanoseconds} ns`)
     }
+    else if (nanoseconds > 0) {
+        result.push(`${nanoseconds} ns`);
+    }
 
     return result.join(' ') 
 }
+
+

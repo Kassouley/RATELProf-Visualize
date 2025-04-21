@@ -32,17 +32,17 @@
     overflow-x: auto;
 }
 
-#csvTable {
+.csvTable {
     width: 100%;
     border-collapse: collapse;
 }
-#csvTable td {
+.csvTable td {
     border-bottom: 1px solid var(--border-color);
     transition: background-color 0.2s ease;
     padding: 8px;
     text-align: left;
 }
-#csvTable th {
+.csvTable th {
     text-align: left;
     font-weight: bold;
     white-space: nowrap;
@@ -51,14 +51,14 @@
     background-color: var(--primary-color);
 }
 
-#csvTable tr:nth-child(even) {
+.csvTable tr:nth-child(even) {
     background-color: #f9f9f9;
 }
 
-#csvTable tr:hover {
+.csvTable tr:hover {
     background-color: #f1f1f1;
 }
 
-#csvTable tr {
+.csvTable tr {
     transition: background-color 0.2s ease;
 }

@@ -35,7 +35,7 @@ end
 -- Function: Embed CSS and JS into HTML
 function merge_html.embed_assets_into_html(html, vis_js_content, vis_css_content, absolute_path)
     html = html:gsub("%<vis%-handler%>", function()
-        return "<style>" .. vis_css_content .. "</style><script>" .. vis_js_content .. "</script>"
+        return "<style>" .. vis_css_content .. "</style><script>" .. vis_js_content .. "\n</script>"
     end)
     html = replace_images_with_base64(html, absolute_path)
 

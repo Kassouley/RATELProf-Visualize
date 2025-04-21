@@ -45,16 +45,21 @@ function getTimelineOptions(traceProcessor) {
     return {
         showCurrentTime: false,
         showMajorLabels: false,
+        horizontalScroll: false,
+        verticalScroll: false,
+        zoomKey: "ctrlKey",
         align: 'center',
         tooltip: {
             followMouse: true,
             template: trace => {
-              let tooltip = `<div><strong>${trace.content}</strong><br>`;
+              let tooltip = `<div>`;
               if (trace.traceData._event_kind === "DISPATCH") {
-                tooltip += `<strong>Event Dispatched:</strong> ${trace.traceData.dispatched_event} (${trace.traceData.corr_id})<br>` +
+                tooltip += `<strong>Dispatch</strong><br>` +
+                           `<strong>Event Dispatched:</strong> ${trace.traceData.dispatched_event} (${trace.traceData.corr_id})<br>` +
                            `<strong>Dispatch Time:</strong> ${traceProcessor.normalizeTime(trace.traceData.dispatch_time)}`;
               } else {
-                tooltip += `<strong>ID:</strong> ${trace.id}<br>` +
+                tooltip += `<strong>${trace.content}</strong><br>` +
+                           `<strong>ID:</strong> ${trace.id}<br>` +
                            `<strong>CID:</strong> ${trace.traceData.corr_id}<br>` +
                            `<strong>Duration:</strong> ${convertTime(trace.traceData.dur, true)}<br>`;
               }
@@ -62,10 +67,13 @@ function getTimelineOptions(traceProcessor) {
               return tooltip;
             }
         },
-        groupOrder: (a, b) => a.value - b.value,
-        groupOrderSwap: (a, b, groups) => {
-            if (a.treeLevel === 1 && b.treeLevel === 1) {
-                [a.value, b.value] = [b.value, a.value];
+        groupEditable: { order: true },
+        groupOrder: "value",
+        groupOrderSwap: function (a, b, groups) {
+            if (a.treeLevel === b.treeLevel && a.nestedInGroup == b.nestedInGroup) {
+                var v = a.value;
+                a.value = b.value;
+                b.value = v;
             }
         },
         groupTemplate: function (group) {
@@ -77,8 +85,6 @@ function getTimelineOptions(traceProcessor) {
 
               var infoIcon      = document.createElement("img");
               infoIcon.src      = "assets/icons/information.png";
-              infoIcon.style.width        = "11px";
-              infoIcon.style.height       = "11px";
               infoIcon.style.paddingRight = "5px";
 
               var tooltipText = document.createElement("span");
@@ -111,7 +117,6 @@ function getTimelineOptions(traceProcessor) {
         max: (maxEnd / 1000) + 1000,
         groupHeightMode: 'fixed',
         orientation: "none",
-        groupEditable: { order: true },
         margin: { item: 10, axis: 5 },
         zoomMin: 5
     };
@@ -130,59 +135,62 @@ function createTimeline(traceProcessor) {
         const traceInfo = document.getElementById('trace-info');
         const traceData = trace.traceData || {};
         const traceArgs = traceData.args  || {};
-        const commonDetails = [];
-        const domainSpecificDetails = [];
+        const lcol = [];
+        const rcol = [];
         
         const append = (details, field, value) => details.push(createDetails(field, value));
 
-        append(commonDetails, "Name", trace.content);
         if (traceData._event_kind === "DISPATCH") {
-                append(commonDetails, "Event Dispatched", `${traceData.dispatched_event} (${traceData.corr_id})`);
-                append(commonDetails, "Dispatch Time",    traceProcessor.normalizeTime(traceData.dispatch_time));
+                append(lcol, "Name",             "Dispatch");
+                append(lcol, "Event Dispatched", `${traceData.dispatched_event} (${traceData.corr_id})`);
+                append(lcol, "Dispatch Time",    traceProcessor.normalizeTime(traceData.dispatch_time));
         } else {
-                append(commonDetails, "ID",         trace.id);
-                append(commonDetails, "CID",        traceData.corr_id);
-                append(commonDetails, "Duration",   convertTime(traceData.dur, true) || 'N/A');
-                append(commonDetails, "Start Time", traceProcessor.normalizeTime(traceData.start));
-                append(commonDetails, "End Time",   traceProcessor.normalizeTime(traceData.end));
+                append(lcol, "Name",       trace.content);
+                append(lcol, "ID",         trace.id);
+                append(lcol, "CID",        traceData.corr_id);
+                append(lcol, "Duration",   convertTime(traceData.dur, true) || 'N/A');
+                append(lcol, "Start Time", traceProcessor.normalizeTime(traceData.start));
+                append(lcol, "End Time",   traceProcessor.normalizeTime(traceData.end));
         }
         const domainHandlers = {
             CPU: () => {
-                append(commonDetails,         "Process ID",   traceData.pid);
-                append(commonDetails,         "Thread ID",    traceData.tid);
-                append(domainSpecificDetails, "Data",         prettyPrint(traceArgs));
+                append(lcol, "Process ID",         traceData.pid);
+                append(lcol, "Thread ID",          traceData.tid);
+                append(rcol, "Function Arguments", prettyPrint(traceArgs));
             },
             KERNEL: () => {
-                append(commonDetails,         "Dispatch Time",          traceProcessor.normalizeTime(traceArgs.dispatch_time));
-                append(domainSpecificDetails, "GPU Node ID",            `${traceProcessor.getNodeIdFromAgent(traceArgs.gpu_id)} (${traceArgs.gpu_id})`);
-                append(domainSpecificDetails, "Queue ID",               traceArgs.queue_id);
-                append(domainSpecificDetails, "Block Dimension",        `[${traceArgs.wrg.join(", ")}]`);
-                append(domainSpecificDetails, "Grid Dimension",         `[${traceArgs.grd.join(", ")}]`);
-                append(domainSpecificDetails, "Private Segment Size",   traceArgs.private_segment_size);
-                append(domainSpecificDetails, "Group Segment Size",     traceArgs.group_segment_size);
-                append(domainSpecificDetails, "Kernel Handle",          traceArgs.kernel_object);
-                append(domainSpecificDetails, "Kernel Arg Addr",        traceArgs.kernarg_address);
-                append(domainSpecificDetails, "Completion Signal",      traceData.sig);
+                append(lcol, "Dispatch Time",          traceProcessor.normalizeTime(traceArgs.dispatch_time));
+                append(rcol, "GPU Node ID",            `${traceProcessor.getNodeIdFromAgent(traceArgs.gpu_id)} (${traceArgs.gpu_id})`);
+                append(rcol, "Queue ID",               traceArgs.queue_id);
+                append(rcol, "Block Dimension",        `[${traceArgs.wrg.join(", ")}]`);
+                append(rcol, "Grid Dimension",         `[${traceArgs.grd.join(", ")}]`);
+                append(rcol, "Private Segment Size",   traceArgs.private_segment_size);
+                append(rcol, "Group Segment Size",     traceArgs.group_segment_size);
+                append(rcol, "Kernel Handle",          traceArgs.kernel_object);
+                append(rcol, "Kernel Arg Addr",        traceArgs.kernarg_address);
+                append(rcol, "Completion Signal",      traceData.sig);
             },
             BARRIER: () => {
-                append(commonDetails,         "Dispatch Time",      traceProcessor.normalizeTime(traceArgs.dispatch_time));
-                append(domainSpecificDetails, "GPU Node ID",        `${traceProcessor.getNodeIdFromAgent(traceArgs.gpu_id)} (${traceArgs.gpu_id})`);
-                append(domainSpecificDetails, "Queue ID",           traceArgs.queue_id);
-                append(domainSpecificDetails, "Completion Signal",  traceData.sig);
+                append(lcol, "Dispatch Time",      traceProcessor.normalizeTime(traceArgs.dispatch_time));
+                append(rcol, "GPU Node ID",        `${traceProcessor.getNodeIdFromAgent(traceArgs.gpu_id)} (${traceArgs.gpu_id})`);
+                append(rcol, "Queue ID",           traceArgs.queue_id);
+                append(rcol, "Dependent Signals",  `[${traceArgs.dep_signal.join(", ")}]`);
+                append(rcol, "Completion Signal",  traceData.sig);
             },
             MEMORY: () => {
-                append(domainSpecificDetails, "Source",             `${traceProcessor.getMemKind(traceArgs.src_type)} Node ID. ${traceProcessor.getNodeIdFromAgent(traceArgs.src_agent)} (${traceArgs.src_agent})`);
-                append(domainSpecificDetails, "Destination",        `${traceProcessor.getMemKind(traceArgs.dst_type)} Node ID. ${traceProcessor.getNodeIdFromAgent(traceArgs.dst_agent)} (${traceArgs.dst_agent})`);
-                append(domainSpecificDetails, "Size transferred",   convertBytes(traceArgs.size));
-                append(domainSpecificDetails, "Completion Signal",  traceData.sig);
+                append(rcol, "Source",             `${traceProcessor.getMemKind(traceArgs.src_type)} Node ID. ${traceProcessor.getNodeIdFromAgent(traceArgs.src_agent)} (${traceArgs.src_agent})`);
+                append(rcol, "Destination",        `${traceProcessor.getMemKind(traceArgs.dst_type)} Node ID. ${traceProcessor.getNodeIdFromAgent(traceArgs.dst_agent)} (${traceArgs.dst_agent})`);
+                append(rcol, "Size transferred",   convertBytes(traceArgs.size));
+                append(rcol, "SDMA Engine ID",     traceArgs.engine_id);
+                append(rcol, "Completion Signal",  traceData.sig);
             }
         };
 
         if (domainHandlers[traceData._event_kind]) domainHandlers[traceData._event_kind]();
 
         traceInfo.innerHTML = '<div class="two-column-flex">' +
-                                `<div class="column"><table class="info-table">${commonDetails.join("\n")}</table></div>` +
-                                `<div class="column"><table class="info-table">${domainSpecificDetails.join("\n")}</table></div>` +
+                                `<div class="column"><table class="info-table">${lcol.join("\n")}</table></div>` +
+                                `<div class="column"><table class="info-table">${rcol.join("\n")}</table></div>` +
                               '</div>';
     };
 
@@ -200,10 +208,10 @@ function createTimeline(traceProcessor) {
         }
     };
 
-    const highlightTraces = selectedItemId => {
+    const highlightTraces = (filterFun) => {
         clearHighlightTraces();
 
-        const matchingItems = itemsDataSet.get().filter(item => item.traceData?.corr_id === selectedItemId);
+        const matchingItems = itemsDataSet.get().filter(filterFun);
         if (matchingItems.length === 0) return;
 
         highlightedOriginalItems.push(...matchingItems);
@@ -225,10 +233,11 @@ function createTimeline(traceProcessor) {
     };
 
 
-    const onSelectTraceAux = id => {
+    const onSelectTraceAux = (id, isCtrlKeyPushed) => {
         const selectedItem = itemsDataSet.get(id);
         if (selectedItem) {
-            highlightTraces(selectedItem.id);
+            if (isCtrlKeyPushed) highlightTraces(item => item.traceData?.corr_id === selectedItem.id);
+            else highlightTraces(item => item.id === selectedItem.traceData?.corr_id);
             showTraceDetails(selectedItem);
         }
     };
@@ -245,32 +254,49 @@ function createTimeline(traceProcessor) {
         const id = parseInt(document.getElementById("id_input").value.trim(), 10);
         if (!isNaN(id)) {
             timeline.setSelection(id, { focus: true });
-            onSelectTraceAux(id);
+            onSelectTraceAux(id, false);
         } else {
             alert("Please enter a valid Trace ID.");
         }
     };
-    
+
     let isRightMouseDown = false;
-    let startTime = null;
+    let firstTime = null;
     let timeMarkerId = "time_marker_id";
     let tempItem = null;
+
+    const updateTimeMarker = (currTime) => {
+        let [start, end] = firstTime < currTime ? [firstTime, currTime] : [currTime, firstTime];
+        let isItemExist = itemsDataSet.get(tempItem.id);
+        if (isItemExist) {
+            itemsDataSet.update({ 
+                id: timeMarkerId, 
+                content: convertTime(end - start), 
+                start, 
+                end 
+            });
+        } else {
+            if (start.getTime() !== end.getTime()) {
+                tempItem.start = start;
+                tempItem.end = end;
+                itemsDataSet.add(tempItem);
+            }
+        }
+    };
 
     timeline.on('contextmenu', function (properties) {
         properties.event.preventDefault();
     });
 
     timeline.on('mouseDown', function (properties) {
-        if (properties.event.button === 2 ) {
+        if (properties.event.button === 2) {
             itemsDataSet.remove(timeMarkerId);
             if (properties.what == 'background' && properties.time) {
                 isRightMouseDown = true;
-                startTime = properties.time;
+                firstTime = properties.time;
                 tempItem = {
                     id: timeMarkerId,
-                    type: "background",
-                    start: startTime,
-                    end: startTime
+                    type: "background"
                 };
             }
         }
@@ -278,34 +304,25 @@ function createTimeline(traceProcessor) {
 
     timeline.on('mouseMove', function (properties) {
         if (isRightMouseDown && properties.time) {
-            let existingItem = itemsDataSet.get(tempItem.id);
-            if (existingItem) {
-                itemsDataSet.update({ 
-                    id: timeMarkerId, 
-                    content: convertTime(properties.time - startTime), 
-                    end: properties.time });
-            } else {
-                itemsDataSet.add(tempItem);
-            }
+            updateTimeMarker(properties.time);
         }
     });
 
     timeline.on('mouseUp', function (properties) {
         if (isRightMouseDown && properties.time) {
-            let existingItem = itemsDataSet.get(tempItem.id);
-            if (existingItem) {
-                itemsDataSet.update({ 
-                    id: timeMarkerId, 
-                    content: convertTime(properties.time - startTime), 
-                    end: properties.time });
-            }
+            updateTimeMarker(properties.time);
         }
         isRightMouseDown = false;
     });
 
+
     timeline.on('select', function (properties) {
         if (properties.items.length > 0) {
-            onSelectTraceAux(properties.items[0]);
+            if (properties.event.srcEvent.ctrlKey) {
+                onSelectTraceAux(properties.items[0], false);
+            } else {
+                onSelectTraceAux(properties.items[0], true);
+            }
         } else {
             clearTraceDetails();
             clearHighlightTraces();

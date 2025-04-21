@@ -26,7 +26,24 @@
       <h1>RATELProf Timeline Visualization</h1> 
     </div>
   </div>
-  
+    
+  <div class="info-container">
+    <div class="info-icon">i</div>
+    <div class="tooltip">
+        <strong>How to use the timeline:</strong>
+        <ul>
+            <li>Ctrl + Wheel up to zoom</li>
+            <li>Ctrl + Wheel down to unzoom</li>
+            <li>Left-click and move to navigate</li>
+            <li>Right-click and move to select an area and see its duration</li>
+            <li>Click a trace to highlight it and highlight in red traces called by this trace</li>
+            <li>Ctrl + Click a trace to highlight it and highlight in red who call this trace</li>
+            <li>Double-click on a trace to focus on it</li>
+            <li>Drag-n-Drop domain group to change their order</li>
+            <li>On "Statistics" tab, click a row to highlight and focus on related traces</li>
+        </ul>
+    </div>
+  </div>
 
   <main>
     <!-- Timeline Container -->
@@ -67,20 +84,31 @@
         <div id="csv-container">
           <!-- Left Column: CSV Names -->
           <div class="csv-list">
-              <ul id="csvList"></ul>
+              <ul id="statsList"></ul>
           </div>
 
           <!-- Right Column: CSV Content -->
-          <div class="csv-content" id="csvContent">
+          <div class="csv-content" id="statsContent">
               Select a CSV file to view its data
           </div>
         </div>
       </div>
 
       <div id="tab3" class="tab-content">
-          <h3>WIP</h3>
+        <div id="csv-container">
+          <!-- Left Column: CSV Names -->
+          <div class="csv-list">
+              <ul id="analyzeList"></ul>
+          </div>
+
+          <!-- Right Column: CSV Content -->
+          <div class="csv-content" id="analyzeContent">
+              Select a CSV file to view its data
+          </div>
+        </div>
       </div>
 
+      <script src="js/msgpack.js"></script>
       <script src="js/utils.js"></script>
       <script src="js/TraceProcessor.js"></script>
       <script src="js/main.min.js"></script>

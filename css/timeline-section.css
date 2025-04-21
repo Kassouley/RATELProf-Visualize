@@ -1,17 +1,26 @@
-.groupClass {
-    background-color: var(--primary-tl);
+.lvl1-group-class {
+    border: 0px;
+    background-color: var(--lvl1-group-color);
+}
+
+.lvl-mid-group-class {
+    border: 0px;
+    background-color: var(--lvl-mid-group-color);
+}
+
+.lvl-last-group-class {
+    border: 0px;
+    background-color: var(--lvl-last-group-color);
 }
 
 .non-highlighted {
-    box-sizing: border-box;
     border: 0px;
     outline: 0px solid;
 }
 
 .highlighted {
-    box-sizing: border-box;
     border: 0px;
-    outline: 2px solid var(--highlight-color);
+    outline: 3px solid var(--highlight-color);
 }
 
 .domain-tooltip {
@@ -20,20 +29,20 @@
 }
 
 .domain-tooltip .tooltiptext {
-    visibility: hidden;
     width: 120px;
     text-align: center;
     left: 110%;
     position: absolute;
-    background-color: var(--primary-bg);
+    background-color: white;
     color: var(--text-color);
     padding: 5px;
     border-radius: 3px;
     font-size: 10px;
     border: 1px solid #808074;
-    z-index: 9999;
+    display: none;
+    z-index: 99999;
 }
 
 .domain-tooltip:hover .tooltiptext {
-    visibility: visible;
+    display: block;
 }

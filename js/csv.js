@@ -1,96 +1,105 @@
+const sortState = {}; // Store sort states per table type
 
-let currentSortColumn = null;
-let isAscending = true; // true = ascending, false = descending
+function displayCSV(data, type) {
+    const tableId = `${type}Table`;
+    let html = `<table class='csvTable' id='${tableId}'><thead><tr>`;
 
-function displayCSV(csvObject) {
-    let html = "<table id='csvTable'><thead><tr>";
-    const rows = csvObject.data.trim().split("\n");
-    const headerCols = rows[0].split(",");
+    const headers = data[0].split(",");
 
-    // Table headers with click event
-    headerCols.forEach((col, index) => {
-        html += `<th onclick="sortTable(${index})">${col} <span class="sort-arrow" id="arrow-${index}">⭥</span></th>`;
+    // Table headers with sorting event
+    headers.forEach((col, index) => {
+        html += `<th data-index="${index}" data-type="${type}" class="sortable">${col}<span class="sort-arrow" id="arrow-${type}-${index}">⭥</span></th>`;
     });
 
     html += "</tr></thead><tbody>";
 
     // Table rows
-    for (let i = 1; i < rows.length; i++) {
-        const cols = rows[i].split(",");
-        html += `<tr onclick="handleRowClick(this)"><td>` + cols.join("</td><td>") + "</td></tr>";
-    }
+    html += data.slice(1).map(row => {
+        return `<tr><td>${row.split(",").join("</td><td>")}</td></tr>`;
+    }).join("");
 
     html += "</tbody></table>";
     return html;
 }
 
-function sortTable(columnIndex) {
-    const table = document.getElementById("csvTable");
+function sortTable(col, type) {
+    const table = document.getElementById(`${type}Table`);
     const tbody = table.querySelector("tbody");
-    const rows = Array.from(tbody.querySelectorAll("tr"));
+    const rows = Array.from(tbody.rows);
 
-    // Toggle sorting direction if same column, otherwise reset to ascending
-    if (currentSortColumn === columnIndex) {
-        isAscending = !isAscending;
-    } else {
-        currentSortColumn = columnIndex;
-        isAscending = true;
-    }
+    // Initialize sorting state if not present
+    if (!sortState[type]) sortState[type] = { col: null, ascending: true };
 
-    // Sorting function
+    const state = sortState[type];
+
+    // Toggle sorting order if sorting same column, otherwise reset to ascending
+    state.ascending = state.col === col ? !state.ascending : true;
+    state.col = col;
+
     rows.sort((rowA, rowB) => {
-        const cellA = rowA.children[columnIndex].textContent.trim();
-        const cellB = rowB.children[columnIndex].textContent.trim();
+        const cellA = rowA.cells[col].textContent.trim();
+        const cellB = rowB.cells[col].textContent.trim();
 
         const numA = parseFloat(cellA);
         const numB = parseFloat(cellB);
 
-        if (!isNaN(numA) && !isNaN(numB)) {
-            return isAscending ? numA - numB : numB - numA;
-        } else {
-            return isAscending ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA);
-        }
+        return !isNaN(numA) && !isNaN(numB)
+            ? (state.ascending ? numA - numB : numB - numA)
+            : (state.ascending ? cellA.localeCompare(cellB) : cellB.localeCompare(cellA));
     });
 
-    // Update table with sorted rows
+    // Apply sorted rows using DocumentFragment for better performance
+    const fragment = document.createDocumentFragment();
+    rows.forEach(row => fragment.appendChild(row));
     tbody.innerHTML = "";
-    rows.forEach(row => tbody.appendChild(row));
+    tbody.appendChild(fragment);
 
-    // Update arrow indicators
-    updateSortArrows(columnIndex);
+    updateSortArrows(col, type, state.ascending);
 }
 
-function updateSortArrows(activeColumn) {
-    // Remove arrows from all headers
-    document.querySelectorAll(".sort-arrow").forEach(arrow => arrow.textContent = "⭥");
-
-    // Set arrow for the active column
-    const arrow = document.getElementById(`arrow-${activeColumn}`);
-    arrow.textContent = isAscending ? "⭡" : "⭣";
+function updateSortArrows(activeColumn, type, isAscending) {
+    document.querySelectorAll(`#${type}Table .sort-arrow`).forEach(arrow => arrow.textContent = "⭥");
+    document.getElementById(`arrow-${type}-${activeColumn}`).textContent = isAscending ? "⭡" : "⭣";
 }
 
-function createCSVList() {
-    const listContainer = document.getElementById("csvList");
-    csv_stats.forEach((csv, index) => {
-        const li = document.createElement("li");
-        li.textContent = csv.name;
-        li.addEventListener("click", () => showCSVContent(index));
-        listContainer.appendChild(li);
-    });
+function createCSVList(csv_data, type) {
+    const listContainer = document.getElementById(`${type}List`);
+    listContainer.innerHTML = csv_data.map(csv => 
+        `<li data-type="${type}" data-name="${csv.name}">${csv.name}</li>`).join("");
 }
 
-function showCSVContent(index) {
-    const contentContainer = document.getElementById("csvContent");
-    contentContainer.innerHTML = displayCSV(csv_stats[index]);
-    currentSortColumn = null; // Reset sorting when switching files
+function showCSVContent(csv, type) {
+    sortState[type] = { col: null, ascending: true }; // Reset sorting
+    const contentEl = document.getElementById(`${type}Content`);
+    const csvTable = displayCSV(csv.data, type);
+    contentEl.innerHTML = type === "analyze" ? `<p>${csv.msg}</p>${csvTable}` : csvTable;
 }
+
+// Event Delegation for sorting
+document.addEventListener("click", event => {
+    if (event.target.matches(".sortable")) {
+        const col = event.target.dataset.index;
+        const type = event.target.dataset.type;
+        sortTable(Number(col), type);
+    } else if (event.target.closest("li")) {
+        // Handling CSV list click
+        const listItem = event.target.closest("li");
+        const type = listItem.dataset.type;
+        const name = listItem.dataset.name;
+        const csv = (type === "stats" ? csv_stats : csv_analyze).find(c => c.name === name);
+        if (csv) showCSVContent(csv, type);
+    } else if (event.target.closest("tr")) {
+        handleRowClick(event.target.closest("tr"));
+    }
+});
 
 function handleRowClick(row) {
-    var itemsDataSet = timelineObject.itemsData;
+    const itemsDataSet = timelineObject.itemsData;
     const itemName = row.lastElementChild.textContent.trim();
-    const matchingItems = itemsDataSet.get().filter(item => item.content === itemName);
-    const ids = matchingItems.flat().map(item => item.id);
-    timelineObject.setSelection(ids, { focus: true } );
+    const ids = itemsDataSet.get().filter(item => item.content === itemName).map(item => item.id);
+    timelineObject.setSelection(ids, { focus: true });
 }
 
-createCSVList();
+// Initialize lists
+createCSVList(csv_stats, "stats");
+createCSVList(csv_analyze, "analyze");
