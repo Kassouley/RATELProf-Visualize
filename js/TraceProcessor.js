@@ -11,21 +11,21 @@ class TraceProcessor {
       id: "Constructor",
       content: "Constructor",
       type: "background",
-      start: data.lifecycle.constructor_start / 1000,
-      end: data.lifecycle.main_start / 1000
+      start: (this.lcEvents.constructor_start) / 1000,
+      end: (this.lcEvents.main_start) / 1000
     },{
       id: "Main",
       content: "Main",
       type: "background",
-      start: data.lifecycle.main_start / 1000,
-      end: data.lifecycle.main_stop / 1000,
+      start: (this.lcEvents.main_start) / 1000,
+      end: (this.lcEvents.main_stop) / 1000,
       className: "mainBackground"
     },{
       id: "Destructor",
       content: "Destructor",
       type: "background",
-      start: data.lifecycle.main_stop / 1000,
-      end: data.lifecycle.destructor_stop / 1000
+      start: (this.lcEvents.main_stop) / 1000,
+      end: (this.lcEvents.destructor_stop) / 1000
     }];
 
     this.minStart = Infinity;
@@ -49,71 +49,36 @@ class TraceProcessor {
   };
 
   getDomainNameFromId(traceDomain) {
-    if (traceDomain == 99) { return "DISPATCH" } 
-    return this.domainIDs[traceDomain]?.name.replace("RATELPROF_", "").replaceAll("_", " ") || "Unknown Domain"
+    for (const [name, value] of Object.entries(this.domainIDs)) {
+      if (value.id == traceDomain) {
+        return name.replace("RATELPROF_DOMAIN_", "").replaceAll("_", " ");
+      }
+    }
+    return "Unknown Domain"
   };
 
   getDomainDescFromId(traceDomain) {
-    if (traceDomain == 99) { return "Dispatch" } 
-    return this.domainIDs[traceDomain]?.desc || "Unknown Domain"
+    for (const [name, value] of Object.entries(this.domainIDs)) {
+      if (value.id == traceDomain) {
+        return value.desc;
+      }
+    }
+    return "Unknown Domain"
   };
 
   processTraces() {
-    const computeDepth = (event, id) => {
-      if (depthMap.has(id)) return depthMap.get(id);
-      if (!event.corr_id || !(event.corr_id in tracesList)) return 1;
     
-      const depth = 1 + computeDepth(tracesList[event.corr_id], event.corr_id);
+    const depthMap = new Map();
+    const groupsList = {};
+    
+    const computeDepth = (events, event, id) => {
+      if (depthMap.has(id)) return depthMap.get(id);
+      if (!event.corr_id || !(event.corr_id in events)) return 1;
+    
+      const depth = 1 + computeDepth(events, events[event.corr_id], event.corr_id);
       depthMap.set(id, depth);
       return depth;
     };
-
-    const idMap = new Map();
-    const depthMap = new Map();
-    const groupsList = {};
-    const tracesList = {};
-    
-    Object.entries(this.traceEvents).forEach(([id, events]) => {
-      groupsList[id] = {
-        group: {
-          className:  "lvl1-group-class",
-          style:      "color:var(--text-color);background-color:var(--lvl1-group-color);font-size:13px;text-align:left;",
-          treeLevel:  1,
-          id:         id,
-          content:    this.getDomainNameFromId(id),
-          desc:       this.getDomainDescFromId(id),
-          showNested: id < 5 ? false : true,
-          value:      id < 5 ? id + 100 : id,
-          nestedGroups: [],
-        },
-        nested_groups: {}
-      };
-    
-      Object.assign(tracesList, events);
-    });
-    
-    Object.entries(this.traceEvents).forEach(([domain, events]) => {
-      Object.entries(events).forEach(([id, event]) => {
-        const { nestedGroupKey: groupId, eventName, subgroup } = preprocessTraceEvents(event, id, domain);
-
-        if (event.start < this.minStart) this.minStart = event.start;
-        if (event.end   > this.maxEnd)   this.maxEnd   = event.end;
-
-        this.items.push({
-          className: 'non-highlighted',
-          style:     'background-color:'+hashStringToLightColor(eventName),
-          id:        id,
-          content:   eventName,
-          start:     Math.round(event.start / 1000),
-          end:       Math.round((event.end + 1000) / 1000),
-          group:     groupId,
-          subgroup:  subgroup,
-          limitSize: true,
-          traceData: event,
-        })
-      })
-    });
-
 
     const createNestedGroup = (parentGroup, id, content, value, treeLevel) => {
       if (!parentGroup.nested_groups[id]) {
@@ -139,18 +104,15 @@ class TraceProcessor {
     };
 
 
-    const preprocessTraceEvents = (event, id, traceDomain) => {
+    const preprocessTraceEvents = (event, id, domain, group) => {
       let eventName = "N/A";
-      let subgroup = 1;
-
-      let domainGroup = groupsList[traceDomain];
 
       let nestedGroupKey, nestedGroupName;
-      if ([5, 6, 7].includes(traceDomain)) {
-        if (traceDomain === 5) {
+      if (["5", "6", "7"].includes(domain)) {
+        if (domain === "5") {
           eventName = event.args.kernel_name || "N/A";
           event._event_kind = "KERNEL";
-        } else if (traceDomain === 6) {
+        } else if (domain === "6") {
           eventName = "BarrierAnd";
           event._event_kind = "BARRIER";
         } else {
@@ -158,12 +120,12 @@ class TraceProcessor {
           event._event_kind = "BARRIER";
         }
 
-        nestedGroupKey  = `${traceDomain}_${event.args.gpu_id}`;
+        nestedGroupKey  = `${domain}_${event.args.gpu_id}`;
         nestedGroupName = `GPU Node ID. ${this.getNodeIdFromAgent(event.args.gpu_id)}`;
 
-        const nestedGroup = createNestedGroup(domainGroup, nestedGroupKey, nestedGroupName, event.args.gpu_id, 2);
+        const nestedGroup = createNestedGroup(group, nestedGroupKey, nestedGroupName, event.args.gpu_id, 2);
 
-        nestedGroupKey  = `${traceDomain}_${event.args.gpu_id}_${event.args.queue_id}`;
+        nestedGroupKey  = `${domain}_${event.args.gpu_id}_${event.args.queue_id}`;
         nestedGroupName = `Queue ID. ${event.args.queue_id}`;
 
         createNestedGroup(nestedGroup, nestedGroupKey, nestedGroupName, event.args.queue_id, 3);
@@ -171,53 +133,89 @@ class TraceProcessor {
         this.items.push({
             className:  'non-highlighted',
             id:         `Dispatch_${id}`,
-            start:      event.args.dispatch_time / 1000,
+            start:      (event.args.dispatch_time) / 1000,
             type:       "point",
             group:      nestedGroupKey,
             traceData: {
-              corr_id: id,
+              corr_id: parseInt(id),
               dispatched_event: eventName,
               dispatch_time: event.args.dispatch_time,
               _event_kind: "DISPATCH"
         }});
 
 
-      } else if (traceDomain === 4) {
+      } else if (domain === "4") {
         eventName = `Copy${this.getMemKind(event.args.src_type)}To${this.getMemKind(event.args.dst_type)}`;
         event._event_kind = "MEMORY";
 
-        nestedGroupKey   = `${traceDomain}_${event.args.engine_id}`;
+        nestedGroupKey   = `${domain}_${event.args.engine_id}`;
         nestedGroupName  = `SDMA ID. ${(event.args.engine_id == -1) ? "Unknown" : event.args.engine_id}`;
         
-        createNestedGroup(domainGroup, nestedGroupKey, nestedGroupName, event.args.engine_id, 2);
+        createNestedGroup(group, nestedGroupKey, nestedGroupName, event.args.engine_id, 2);
 
       } else {
         eventName = event.name;
         event._event_kind = "CPU";
         
-        nestedGroupKey     = `${traceDomain}_${event.tid}`;
+        nestedGroupKey     = `${domain}_${event.tid}`;
         nestedGroupName    = `TID. ${event.tid}`;
         
-        createNestedGroup(domainGroup, nestedGroupKey, nestedGroupName, event.tid, 2);
-        subgroup = computeDepth(event, id);
+        createNestedGroup(group, nestedGroupKey, nestedGroupName, event.tid, 2);
       }
-      return {nestedGroupKey, eventName, subgroup}
+
+      return {nestedGroupKey, eventName}
     };
 
     function concatGroups(groupsList) {
       let result = [];
-      for (const key in groupsList) {
-          if (groupsList.hasOwnProperty(key)) {
-              const group = groupsList[key];
-              result.push(group.group);
-              if (group.nested_groups && typeof group.nested_groups === 'object') {
-                result = result.concat(concatGroups(group.nested_groups));
-              }
-          }
+      for (const [d, group] of Object.entries(groupsList)) {
+        result.push(group.group);
+        if (group.nested_groups && typeof group.nested_groups === 'object') {
+          result = result.concat(concatGroups(group.nested_groups));
+        }
       }
       return result;
    }
 
+    for (const [domain, events] of Object.entries(this.traceEvents)) {
+      const d = parseInt(domain)
+      const group = {
+        group: {
+          className:  "lvl1-group-class",
+          style:      "color:var(--text-color);background-color:var(--lvl1-group-color);font-size:13px;text-align:left;",
+          treeLevel:  1,
+          id:         d,
+          content:    this.getDomainNameFromId(d),
+          desc:       this.getDomainDescFromId(d),
+          showNested: d < 5 ? false : true,
+          value:      d < 5 ? 100 + d : d,
+          nestedGroups: [],
+        },
+        nested_groups: {}
+      };
+      groupsList[d] = group;
+
+
+      for (const [id, event] of Object.entries(events)) {
+        const { nestedGroupKey: groupId, eventName } = preprocessTraceEvents(event, id, domain, group);
+
+        if (event.start < this.minStart) this.minStart = (event.start);
+        if (event.stop  > this.maxEnd)   this.maxEnd   = (event.stop);
+
+        this.items.push({
+          className: 'non-highlighted',
+          style:     'background-color:'+hashStringToLightColor(eventName),
+          id:        parseInt(id),
+          content:   eventName,
+          start:     Math.round(((event.start) / 1000)),
+          end:       Math.round(((event.stop + 1000) / 1000)),
+          group:     groupId,
+          subgroup:  computeDepth(events, event, id),
+          limitSize: true,
+          traceData: event,
+        })
+      }
+    };
     this.groups = concatGroups(groupsList);
   }
 }

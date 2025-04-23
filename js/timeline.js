@@ -4,8 +4,9 @@ function prettyPrint(obj, indentLevel = 0) {
 
   for (const key in obj) {
     const field = obj[key];
+    console.log(typeof (field), field, key);
     if (typeof field === 'object' && field !== null) {
-      if (field.type && field.value) {
+      if (field.type != undefined && field.value != undefined) {
         html += `<div class="${indentClass}"><span class="type">${field.type}</span> <span class="key">${key}</span> =  `;
         if (field.value["->*"]) {
           const keys = Object.keys(field.value);
@@ -150,7 +151,7 @@ function createTimeline(traceProcessor) {
                 append(lcol, "CID",        traceData.corr_id);
                 append(lcol, "Duration",   convertTime(traceData.dur, true) || 'N/A');
                 append(lcol, "Start Time", traceProcessor.normalizeTime(traceData.start));
-                append(lcol, "End Time",   traceProcessor.normalizeTime(traceData.end));
+                append(lcol, "End Time",   traceProcessor.normalizeTime(traceData.stop));
         }
         const domainHandlers = {
             CPU: () => {

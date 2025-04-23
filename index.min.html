@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trace Timeline Visualization</title>
 
-  <vis-handler>
+  <!-- <vis-handler> -->
+  <script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/vis-timeline/styles/vis-timeline-graph2d.min.css">
+  
 
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/components.css">
@@ -111,8 +114,8 @@
       <script src="js/msgpack.js"></script>
       <script src="js/utils.js"></script>
       <script src="js/TraceProcessor.js"></script>
-      <script src="js/main.min.js"></script>
       <script src="js/timeline.js"></script>
+      <script src="js/main.min.js"></script>
       <script src="js/csv.js"></script>
       <script>
         function openTab(event, tabId) {
