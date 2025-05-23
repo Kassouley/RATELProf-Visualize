@@ -108,11 +108,11 @@ class TraceProcessor {
       let eventName = "N/A";
 
       let nestedGroupKey, nestedGroupName;
-      if (["5", "6", "7"].includes(domain)) {
-        if (domain === "5") {
+      if (["7", "8", "9"].includes(domain)) {
+        if (domain === "7") {
           eventName = event.args.kernel_name || "N/A";
           event._event_kind = "KERNEL";
-        } else if (domain === "6") {
+        } else if (domain === "8") {
           eventName = "BarrierAnd";
           event._event_kind = "BARRIER";
         } else {
@@ -144,7 +144,7 @@ class TraceProcessor {
         }});
 
 
-      } else if (domain === "4") {
+      } else if (domain === "6") {
         eventName = `Copy${this.getMemKind(event.args.src_type)}To${this.getMemKind(event.args.dst_type)}`;
         event._event_kind = "MEMORY";
 
@@ -178,7 +178,7 @@ class TraceProcessor {
    }
 
     for (const [domain, events] of Object.entries(this.traceEvents)) {
-      const d = parseInt(domain)
+      const d = parseInt(domain);
       const group = {
         group: {
           className:  "lvl1-group-class",
@@ -187,8 +187,8 @@ class TraceProcessor {
           id:         d,
           content:    this.getDomainNameFromId(d),
           desc:       this.getDomainDescFromId(d),
-          showNested: d < 5 ? false : true,
-          value:      d < 5 ? 100 + d : d,
+          showNested: d < 6 ? false : true,
+          value:      d < 6 ? 100 + d : d,
           nestedGroups: [],
         },
         nested_groups: {}

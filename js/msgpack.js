@@ -4,10 +4,10 @@ function decodeBase64MsgPack(base64) {
 
     function readUint32BE(pos) {
         return (
-            (binary.charCodeAt(pos) << 24) |
-            (binary.charCodeAt(pos + 1) << 16) |
-            (binary.charCodeAt(pos + 2) << 8) |
-            binary.charCodeAt(pos + 3)
+            (binary.charCodeAt(pos)     << 24)  |
+            (binary.charCodeAt(pos + 1) << 16)  |
+            (binary.charCodeAt(pos + 2) << 8)   |
+             binary.charCodeAt(pos + 3)
         ) >>> 0;
     }
 
@@ -15,6 +15,8 @@ function decodeBase64MsgPack(base64) {
         const byte = binary.charCodeAt(offset++);
 
         if (byte <= 0x7f) return byte;
+
+        if (byte >= 0xe0) return byte - 0x100;
 
         // FixMap (0x80 to 0x8f)
         if ((byte & 0xf0) === 0x80) {
@@ -135,10 +137,13 @@ function decodeBase64MsgPack(base64) {
             return arr;
         }
 
+        let in_item = 0
+        
         if (byte === 0xde) {
             const size = (binary.charCodeAt(offset) << 8) | binary.charCodeAt(offset + 1);
             offset += 2;
             const map = {};
+            
             for (let i = 0; i < size; i++) {
                 const key = decode();
                 const value = decode();
@@ -151,6 +156,7 @@ function decodeBase64MsgPack(base64) {
             const size = readUint32BE(offset);
             offset += 4;
             const map = {};
+
             for (let i = 0; i < size; i++) {
                 const key = decode();
                 const value = decode();

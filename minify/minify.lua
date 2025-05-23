@@ -5,6 +5,7 @@ local merge_js = require("merge_js")
 local merge_css = require("merge_css")
 
 local function main(arg)
+    local output_dir = arg[1] or "."
     local absolute_path = lfs.get_script_path(1).."../"
     local file = nil
 
@@ -28,7 +29,7 @@ local function main(arg)
 
     html_content = merge_html.embed_assets_into_html(html_content, vis_js_content, vis_css_content, absolute_path)
 
-    local output_file = io.open("index.min.html", "w")
+    local output_file = io.open(output_dir.."/index.min.html", "w")
     output_file:write(html_content)
     output_file:close()
 

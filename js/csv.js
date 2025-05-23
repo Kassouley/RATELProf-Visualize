@@ -8,7 +8,7 @@ function displayCSV(data, type) {
 
     // Table headers with sorting event
     headers.forEach((col, index) => {
-        html += `<th data-index="${index}" data-type="${type}" class="sortable">${col}<span class="sort-arrow" id="arrow-${type}-${index}">⭥</span></th>`;
+        html += `<th data-index="${index}" data-type="${type}" class="sortable">${col}<span class="sort-arrow" id="arrow-${type}-${index}"> ⭥</span></th>`;
     });
 
     html += "</tr></thead><tbody>";
@@ -58,8 +58,8 @@ function sortTable(col, type) {
 }
 
 function updateSortArrows(activeColumn, type, isAscending) {
-    document.querySelectorAll(`#${type}Table .sort-arrow`).forEach(arrow => arrow.textContent = "⭥");
-    document.getElementById(`arrow-${type}-${activeColumn}`).textContent = isAscending ? "⭡" : "⭣";
+    document.querySelectorAll(`#${type}Table .sort-arrow`).forEach(arrow => arrow.textContent = " ⭥");
+    document.getElementById(`arrow-${type}-${activeColumn}`).textContent = isAscending ? " ⭡" : " ⭣";
 }
 
 function createCSVList(csv_data, type) {
@@ -71,8 +71,11 @@ function createCSVList(csv_data, type) {
 function showCSVContent(csv, type) {
     sortState[type] = { col: null, ascending: true }; // Reset sorting
     const contentEl = document.getElementById(`${type}Content`);
-    const csvTable = displayCSV(csv.data, type);
-    contentEl.innerHTML = type === "analyze" ? `<p>${csv.msg}</p>${csvTable}` : csvTable;
+    let data = "";
+    if (csv.msg) data += `<p>${csv.msg}</p>`;
+    if (csv.data.length !== 0 != 0) data += displayCSV(csv.data, type);
+    if (data == "") data = "No data available this report.";
+    contentEl.innerHTML = data;
 }
 
 // Event Delegation for sorting
