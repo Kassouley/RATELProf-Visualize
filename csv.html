@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RATELProf Visualize</title>
+
+<link rel="stylesheet" href="global/style/global.css">
+<link rel="stylesheet" href="global/style/table.css">
+<link rel="stylesheet" href="global/style/components.css">
+
+<link rel="stylesheet" href="csv/style/main-panel.css">
+<link rel="stylesheet" href="csv/style/csv-tree.css">
+<link rel="stylesheet" href="csv/style/csv-table.css">
+<link rel="stylesheet" href="csv/style/csv-misc.css">
+
+<script src="global/js/splitView.js"></script>
+<script src="global/js/Table.js"></script>
+<script src="global/js/chart.js"></script>
+<script src="global/js/plotRendering.js"></script>
+
+<script src="csv/js/textRendering.js"></script>
+<script src="csv/js/csv.js"></script>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const type = urlParams.get('type');
+
+    const configName = `${type}Config`; 
+    console.log(configName)
+    let CONFIG = {};
+    function saveConfig() {
+        localStorage.setItem(configName, JSON.stringify(CONFIG));
+    }
+
+    function loadConfig() {
+        return JSON.parse(localStorage.getItem(configName)) || {};
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        CONFIG = loadConfig();
+    });
+
+    window.addEventListener('beforeunload', () => {
+        saveConfig();
+    });
+
+    const script = document.createElement('script');
+    script.src = `data/${type}.js`;
+    script.onload = () => {
+        createCSVtree(__CSV_DATA__);
+    };
+    document.head.appendChild(script);
+</script>
+</head>
+
+<body>
+
+<div id="header">
+    <h1>RATELProf Visualization</h1>
+    <div>
+        <a href="index.html">Summary</a>
+        <!-- <a href="timeline.html">Timeline</a> -->
+        <a href="breakdown.html">Breakdown</a>
+        <a href="csv.html?type=statistics">Statistics</a>
+        <a href="csv.html?type=analyze">Analyze</a>
+    </div>
+</div>
+
+
+<div class="main-panels">
+    <div id="sidebar" class="sidebar">
+        <ul id="treeView"></ul>
+    </div>
+
+    <button id="toggleBtn" class="toggle-btn" onclick="
+        const e = document.getElementById('sidebar');
+        e.style.display = (e.style.display === 'none' ? 'flex' : 'none')">☰</button>
+
+    <div id="contentPanel" class="content-panel">
+        <div class="top" id="topPanel"></div>
+        <div id="divider"></div>
+        <div class="bottom">
+            <div class="tool-bar">
+                <input id="searchBar" placeholder="Search..." />
+
+                <button class="config-toggle" onclick="
+                    const e = document.getElementById('configPanel');
+                    e.style.display = (e.style.display === 'none' ? 'block' : 'none')">
+                    &#9881;
+                </button>
+            </div>
+
+            <div id="configPanel" style="display: none;">
+                Hide columns:
+                <div class="hidden-toggle-buttons"></div>
+
+                <div class="selector">
+                    <label for="timeunit">Time Unit:</label>
+                    <select id="timeunit">
+                        <option>ns</option>
+                        <option>us</option>
+                        <option>ms</option>
+                        <option>s</option>
+                    </select>
+                </div>
+
+                <div class="selector">
+                    <label for="sizeunit">Size Unit:</label>
+                    <select id="sizeunit">
+                        <option>B</option>
+                        <option>KB</option>
+                        <option>MB</option>
+                        <option>GB</option>
+                    </select>
+                </div>
+
+                <div class="selector">
+                    <label for="notation">Notation:</label>
+                    <select id="notation">
+                        <option>Scientific</option>
+                        <option>Thousand Separator</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="csv-table">
+                <table>
+                    <thead><tr id="headerRow"></tr></thead>
+                    <tbody id="dataRows"></tbody>
+                </table>
+            </div>
+
+            <div class="csv-pagination" role="navigation">
+                <button id="prevPage" class="light">◀</button>
+                <label for="pageSelect">Page</label>
+                <select id="pageSelect"></select>
+                <span   id="pageInfo"></span>
+                <button id="nextPage" class="light">▶</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+const topPanel = document.getElementById("topPanel");
+enableSplitView("contentPanel", "divider", "horizontal", (newSize) => {
+    topPanel.style.height = newSize + "px";
+})
+</script>
+
+<script>
+const notationSelect = document.getElementById("notation");
+const timeunitSelect = document.getElementById("timeunit");
+const sizeunitSelect = document.getElementById("sizeunit");
+const searchBar      = document.getElementById("searchBar");
+
+const prevBtn = document.getElementById("prevPage");
+const nextBtn = document.getElementById("nextPage");
+const pageSelect = document.getElementById("pageSelect");
+const pageInfo = document.getElementById("pageInfo");
+
+let currentPage = null;
+let totalPages = null;
+let loadPage = null;
+
+function initPagination(total, initPage, onPageLoad) {
+    totalPages = total;
+    currentPage = initPage;
+    loadPage = onPageLoad;
+
+    pageSelect.innerHTML = "";
+
+    for (let i = 1; i <= totalPages; i++) {
+        const option = document.createElement("option");
+        option.value = i;
+        option.textContent = `${i}`;
+        pageSelect.appendChild(option);
+    }
+
+    updatePagination();
+}
+
+function updatePagination() {
+    pageSelect.value = currentPage;
+    pageInfo.textContent = `of ${totalPages}`;
+
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+}
+
+prevBtn.addEventListener("click", () => {
+    if (currentPage > 1) {
+        currentPage--;
+        updatePagination();
+        loadPage(currentPage);
+    }
+});
+
+nextBtn.addEventListener("click", () => {
+    if (currentPage < totalPages) {
+        currentPage++;
+        updatePagination();
+        loadPage(currentPage);
+    }
+});
+
+pageSelect.addEventListener("change", () => {
+    currentPage = Number(pageSelect.value);
+    updatePagination();
+    loadPage(currentPage);
+});
+</script>
+
+
+</body>
+</html>

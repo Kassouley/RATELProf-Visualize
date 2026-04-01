@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RATELProf Visualize</title>
+<link rel="stylesheet" href="global/style/global.css">
+<link rel="stylesheet" href="global/style/components.css">
+<link rel="stylesheet" href="global/style/table.css">
+<link rel="stylesheet" href="summary/style/summary.css">
+
+<script src="global/js/splitView.js"></script>
+<script src="global/js/Table.js"></script>
+
+<script src="global/js/chart.js"></script>
+<script src="global/js/chart-label.js"></script>
+<script src="global/js/plotRendering.js"></script>
+
+<script src="data/summary.js"></script>
+</head>
+<body>
+
+<div id="header">
+    <h1>RATELProf Visualization</h1>
+    <div>
+        <a class="active" href="index.html">Summary</a>
+        <!-- <a href="timeline.html">Timeline</a> -->
+        <a href="breakdown.html">Breakdown</a>
+        <a href="csv.html?type=statistics">Statistics</a>
+        <a href="csv.html?type=analyze">Analyze</a>
+    </div>
+</div>
+
+
+<div id="grid-container">
+  <div class="grid-item">
+    <div class="grid-header"> Profiling Summary </div>
+    <div id="profiling-table" class="scrollable"></div>
+  </div>
+  <div class="grid-item">
+    <div class="grid-header"> Summary Plot </div>
+    <div id="plot-container"></div>
+  </div>
+  <div class="grid-item">
+    <div class="grid-header"> Experiment Info </div>
+    <div id="experiment-table" class="scrollable"></div>
+  </div>
+  <div class="grid-item">
+    <div class="grid-header">
+      <span>GPU Nodes</span>
+      <select id="gpu-select"></select>
+    </div>
+    <div id="gpu-table" class="scrollable"></div>
+  </div>
+
+  <!-- Invisible dividers for dragging -->
+  <div id="divider-vertical"></div>
+  <div id="divider-horizontal"></div>
+</div>
+
+<script>
+
+function fillGPUTable(tableId, data) {
+    const container = document.getElementById(tableId);
+
+    // Populate GPU select options
+    const select = document.getElementById('gpu-select');
+    Object.keys(data).forEach(id => {
+        const option = document.createElement('option');
+        option.textContent = `GPU ${id}`;
+        option.value = id;
+        select.appendChild(option);
+    });
+
+
+    function updateTable(selectedValue) {
+        const newData = data[selectedValue];
+        if (!newData) return;
+
+        const script = document.createElement("script");
+        script.src = newData;
+
+        script.onload = () => {
+            container.innerHTML = "";
+            const table = new Table(container);
+
+            Object.entries(window.currentGPU).forEach(([key, value]) => {
+                if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+                    const numberSubrow = Object.keys(value).length;
+                    table.addRow([key, ""], { numberSubrow });
+
+                    Object.entries(value).forEach(([subKey, subValue]) => {
+                        table.addRow([subKey, subValue]);
+                    });
+                } else {
+                    table.addRow([key, value]);
+                }
+            });
+        };
+
+        document.head.appendChild(script);
+    }
+
+    select.addEventListener("change", (e) => {
+        updateTable(e.target.value);
+    });
+    updateTable(select.value);
+}
+
+
+function fillTable(tableId, rows) {
+    const container  = document.getElementById(tableId);
+    const plotContainer = document.getElementById("plot-container");
+
+    const table = new Table(container, { subgroupPadding: 24 });
+
+    function addRows(rows) {
+        rows.forEach(row => {
+            const { colspan, collapsed, subrows, cells, tooltip, onClick, data, defaultPlot} = row;
+            let onClickCallback = null;
+            if (onClick && data) onClickCallback = function () {
+                window[onClick](plotContainer, data);
+            };
+            if (defaultPlot) onClickCallback();
+            const numberSubrow = subrows ? subrows.length : 0;
+            table.addRow(cells, { colspan, numberSubrow, collapsed, tooltip, onClick: onClickCallback });
+            if (subrows) addRows(subrows);
+        });
+    }
+
+    addRows(rows);
+}
+
+fillTable("profiling-table", __SUMMARY_DATA__.PROFILING.rows)
+fillTable("experiment-table", __SUMMARY_DATA__.EXPERIMENT.rows)
+fillGPUTable("gpu-table", __SUMMARY_DATA__.GPU)
+
+
+
+const container = document.getElementById('grid-container');
+enableSplitView("grid-container", "divider-vertical", "vertical", (newSize) => {
+    container.style.gridTemplateColumns = `${newSize}px 5px auto`;
+})
+enableSplitView("grid-container", "divider-horizontal", "horizontal", (newSize) => {
+    container.style.gridTemplateRows = `${newSize}px 5px auto`;
+})
+</script>
+
+</body>
+</html>

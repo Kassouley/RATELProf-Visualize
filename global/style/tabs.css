@@ -1,0 +1,30 @@
+
+.tabs {
+    cursor: pointer;
+    width: 100%;
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tabs a,
+.tabs button {
+    all: unset;
+    cursor: pointer;
+    text-decoration: none;
+    padding: 8px 14px;
+
+    border-right: 1px solid var(--border-color);
+    background: var(--secondary-bg);
+    color: var(--text-color-dark);
+
+    font-size: 14px;
+}
+
+.tabs a:hover,
+.tabs button:hover {
+    background: var(--primary-bg);
+}
+
+.tabs .active {
+    background: var(--primary-bg);
+}

@@ -1,0 +1,67 @@
+/* Grid container */
+#grid-container {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 5px 1fr;
+    grid-template-rows: 1fr 5px 1fr;
+    width: 100%;
+    position: relative;
+}
+
+
+/* Grid items */
+.grid-item {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--secondary-bg);
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    padding: 10px;
+    overflow: hidden;
+}
+
+
+/* invisible dividers */
+#divider-vertical { grid-column: 2; grid-row: 1 / 4;}
+#divider-horizontal { grid-column: 1 / 4; grid-row: 2;}
+
+
+.grid-header {
+    padding: 5px;
+    padding-left: 10px;
+    font-size: 18px;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    background-color: var(--primary-color);
+    color: var(--text-color-light);
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.grid-header:hover {
+    background-color: var(--secondary-color);
+}
+
+
+.info-icon {
+    margin-right: 3px;
+    cursor: help;
+}
+
+.info-icon::before {
+    content: "ⓘ";
+}
+
+#plot-container {
+    flex:1;
+    height: 100%;
+    min-height: 0;
+}
+
+table td:first-child,
+table th:first-child {
+    font-weight: bold;
+}

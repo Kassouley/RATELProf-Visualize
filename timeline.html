@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RATELProf Visualize</title>
+<link rel="stylesheet" href="global/style/global.css">
+<link rel="stylesheet" href="global/style/components.css">
+<link rel="stylesheet" href="global/style/tabs.css">
+
+<link rel="stylesheet" href="timeline/style/timeline-gl.css">
+<link rel="stylesheet" href="timeline/style/tabs.css">
+
+<script src="https://cdn.jsdelivr.net/npm/deck.gl@latest/dist.min.js"></script>
+
+<script src="global/js/splitView.js"></script>
+
+<script src="timeline/js/HistogramLayer.js"></script>
+<script src="timeline/js/ControllerGL.js"></script>
+<script src="timeline/js/UtilsGL.js"></script>
+<script src="timeline/js/GroupGL.js"></script>
+<script src="timeline/js/BucketManager.js"></script>
+<script src="timeline/js/TimelineGL.js"></script>
+<script src="timeline/js/utils.js"></script>
+
+<script src="timeline/js/timeInput.js"></script>
+<script src="timeline/js/selectInput.js"></script>
+<script src="timeline/js/fileManager.js"></script>
+
+<script src="data/timeline.js"></script>
+
+<script>
+    const configName = "timelineConfig"; 
+    let CONFIG;
+
+    function saveConfig() {
+        localStorage.setItem(configName, JSON.stringify(CONFIG));
+    }
+
+    function loadConfig() {
+        return JSON.parse(localStorage.getItem(configName)) || {};
+    }
+
+    CONFIG = loadConfig() ?? {
+      rank: 0,
+      initialView: [0, 1_000_000],
+      maxLoadedBuckets: 50
+    };
+
+    window.addEventListener('beforeunload', () => {
+        CONFIG.initialView = timeline.getView();
+        saveConfig();
+    });
+</script>
+</head>
+
+<body>
+
+<div id="header">
+    <h1>RATELProf Visualization</h1>
+    <div>
+        <a class="active" href="index.html">Summary</a>
+        <a href="timeline.html">Timeline</a>
+        <a href="breakdown.html">Breakdown</a>
+        <a href="csv.html?type=statistics">Statistics</a>
+        <a href="csv.html?type=analyze">Analyze</a>
+    </div>
+</div>
+
+<div id="dividerPanel">
+      <div id="folderButton" style="display:none"></div>
+
+    <div id="timeline-container"></div>
+
+    <div class="divider" id="divider"></div>
+
+    <div id="bottomPanel">
+      <div class="tabs">
+        <button onclick="changeTab(this, 'settings')">⚙</button>
+        <button onclick="changeTab(this, 'event')" class="active">Event</button>
+
+        <div id="fileSelector"></div>
+        <div id="gotoDiv">
+          <input id="gotoInput"></input>
+          <button id="gotoButton">GOTO</button>
+        </div>
+      </div>
+
+      <div class="tab-content" id="event">EVENT</div>
+
+      <div class="tab-content" id="settings">
+        <div class="settings-left">
+          <div class="setting-item" data-desc="Displays the current frames per second on screen.">
+            <label> <input type="checkbox" id="toggleFPS"> Show FPS </label>
+          </div>
+          <div class="setting-item" data-desc="Maximum number of buckets that can be loaded simultaneously. Higher values increase memory usage but may improve loading speed.">
+            <label> Max Buckets Loaded <input type="number" id="maxBuckets" min="1" max="1000"> </label>
+          </div>
+        </div>
+
+        <div class="settings-right">
+          <div id="messageText"></div>
+          <div id="timelineTips">
+            <strong>How to use the timeline:</strong>
+            <ul>
+                <li>Ctrl + Wheel up to zoom</li>
+                <li>Ctrl + Wheel down to unzoom</li>
+                <li>Left-click and move to navigate</li>
+                <li>Click on histogram to move at clicked area</li>
+                <li>Right-click and move to select an area and see its duration</li>
+                <li>Click a trace to highlight it and highlight in red traces called by this trace</li>
+                <li>Ctrl + Click a trace to highlight it and highlight in red who call this trace</li>
+                <li>Double-click on a trace to focus on it</li>
+                <li>Drag-n-Drop domain group to change their order</li>
+                <li>Click on group's arrow to hide/show group</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>
+
+<script>
+
+    function changeTab(button, tabId) {
+      document.querySelectorAll('.tab-content')
+        .forEach(c => c.style.display = 'none');
+
+      if(button) document.querySelectorAll('.tabs button')
+        .forEach(b => b.classList.remove('active'));
+
+      document.getElementById(tabId).style.display = 'flex';
+
+      if(button) button.classList.add('active');
+    }
+
+    changeTab(null, "event");
+
+    const timeline = new TimelineGL("timeline-container", { 
+        initialView: CONFIG.initialView,
+        eventHeight: 20,
+        trackHeight: 30,
+        groupLabelHeight: 50,
+        maxLoadedBuckets: CONFIG.maxLoadedBuckets,
+        getEventTooltip: (e) => ` <b>${e[NAME]}</b> <br> 
+                                  <b>Group: </b>     ${e[GROUP]} <br> 
+                                  <b>Track: </b>     ${e[TRACK]} <br> 
+                                  <b>Subtrack: </b>  ${e[SUBTRACK]} <br> 
+                                  <b>Start: </b>     ${e[START]} <br> 
+                                  <b>End: </b>       ${e[STOP]} <br> 
+                                  <b>Duration: </b>  ${e[STOP] - e[START]}`,
+        getHistogramTooltip: (segments) => {
+            return segments.map(
+              s => `<b>${s.name}</b>: ${(s.percent * 100).toFixed(2)}%`).join('<br>')
+        },
+        onEventClick: (event) => {
+            console.log('Selected event:', event[NAME]);
+        }
+      });
+      
+    console.log("TimelineGL initialized");
+
+    const timelineContainer = document.getElementById("timeline-container");
+    enableSplitView("dividerPanel", "divider", "horizontal", (newSize) => {
+        timeline.setTimelineHeight(newSize);
+        timelineContainer.style.height = newSize + "px";
+    });
+
+
+    const timelineTips = document.getElementById("timelineTips");
+    const messageText  = document.getElementById("messageText");
+    document.querySelectorAll(".setting-item").forEach(item=>{
+        item.addEventListener("mouseenter",()=>{
+            timelineTips.style.display = "none";
+            messageText.textContent = item.dataset.desc
+        })
+
+        item.addEventListener("mouseleave",()=>{
+            messageText.textContent = "";
+            timelineTips.style.display = "block";
+        })
+    })
+
+    document.getElementById("toggleFPS")
+      .addEventListener("change", (e) => {
+        timeline.toggleFPS(e.target.checked);
+      });
+
+    const input = document.getElementById("maxBuckets");
+    input.value = CONFIG.maxLoadedBuckets;
+    input.addEventListener("input", (e) => {
+      CONFIG.maxLoadedBuckets = e.target.value;
+      timeline.setMaxLoadedBuckets(e.target.value);
+    });
+
+    const fileManager = new FileManager({
+        path: PATH,
+        folderName: FOLDER_NAME,
+        folderButton: "folderButton",
+        handleFile: (file) => { 
+          timeline.loadFile(file) 
+        }
+    })
+
+    const selectInput = new SelectInput("fileSelector", CONFIG.rank, (option, index) => {
+      CONFIG.rank = index;
+      const filename = option.toLowerCase().replace(/ /g, '_') + REPORT_EXT;
+      fileManager.openFile(filename);
+    });
+    FILENAMES.forEach(e => selectInput.addOption(e));
+
+    fileManager.onFolderSelect(() => {
+        timelineContainer.style.display = "flex"; 
+        selectInput.triggerSelect();
+    });
+
+    const timeInput = new TimeInput("gotoInput");
+    document.getElementById("gotoButton").addEventListener("click", () => {
+      const {ss, ms, us, ns} = timeInput.getValue();
+      const totalNs = ss*1e9 + ms*1e6 + us*1e3 + ns;
+      timeline.syncView(totalNs);
+    })
+
+
+    if (IS_LOCAL) {
+      timelineContainer.style.display = "none"; 
+    }
+
+</script>
+</html>

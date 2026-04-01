@@ -1,0 +1,173 @@
+#dividerPanel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--secondary-bg);
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 10px;
+    min-height: 0;
+}
+
+.timeline-divider {
+  background: var(--border-color);
+}
+
+.timeline-divider::before {
+    width: 5;
+    content: "⋮";
+    font-size: 11px;
+    color: var(--text-color-dark);
+    user-select: none;
+    pointer-events: none;
+}
+
+.timeline-divider[data-orientation="horizontal"]::before {
+  height: 5;
+  transform: rotate(90deg);
+}
+
+#timeline-container {
+  box-sizing: border-box;
+  display: 'flex';
+  width: 100%;
+  height: 75%;
+}
+
+
+#bottomPanel {
+  margin-top: 5px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.timeline-axis {
+    --axis-height: 50;
+    --axis-color: var(--text-color-dark);
+    --axis-font: var(--font-family);
+    --axis-font-size: 10;
+    --axis-tick-size: 6;
+    --axis-align: bottom;
+}
+
+.group-label {
+  border-top: 1px solid var(--border-color);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-label-text {
+  flex: 1;
+  padding-left: 10px;
+  text-align: left;
+  order: 99;
+}
+
+.track-container {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-color);
+
+}
+
+/* Track labels base styling */
+.track-label {
+  border-top: 1px solid var(--border-color);
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  justify-content: right;
+
+  padding: 0 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+
+/* Default prefix for all but last */
+.track-label::before {
+  content: "├─ ";
+  margin-right: 8px;
+}
+
+/* Last track gets the "└─" prefix */
+.track-label:last-child::before {
+  content: "└─ ";
+}
+
+
+.collapse-arrow,
+.drag-handle {
+  user-select: none;
+  font-size: 18px;
+}
+
+
+.collapse-arrow {
+  cursor: pointer;
+}
+
+.collapse-arrow::before {
+  content: "▾";
+}
+
+.collapse-arrow.collapsed::before {
+  content: "▸";
+}
+
+.drag-handle {
+  margin: 0 8px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drag-handle::before {
+  content: "☰";
+}
+
+/* While dragging */
+.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+#timeline-tooltip {
+  display: none;
+  background-color: #1e1e2f; /* Dark, elegant background */
+  color: #ffffff;             /* White text for contrast */
+  padding: 8px 14px;          /* Comfortable padding */
+  border-radius: 8px;         /* Rounded corners */
+  font-size: 14px;             /* Readable font size */
+  font-family: var(--font-family);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); /* Soft shadow */
+  line-height: 1.4;           /* Better text readability */
+  max-width: 250px;           /* Prevent overly wide tooltips */
+}
+
+
+#folderButton {
+  justify-content: center;
+  align-items: center;
+
+  text-align: center;
+  padding: 20px;
+  max-width: 420px;
+  margin: 20px auto;
+}

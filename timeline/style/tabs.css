@@ -1,0 +1,103 @@
+.tab-content {
+  display:none;
+  overflow: auto;
+  min-height: 0;
+  height: 100%;
+  padding:15px;
+}
+
+
+/* SETTINGS TAB */
+#settings{
+  display:flex;
+}
+
+.settings-left{
+  width:40%;
+  border-right:1px solid var(--border-color);
+  padding:10px;
+}
+
+.settings-right{
+  width:60%;
+  padding:10px;
+  color:#444;
+}
+
+.setting-item{
+  margin-bottom:15px;
+  padding:8px;
+  cursor:help;
+  border-radius:4px;
+}
+
+.setting-item:hover{
+  background:#f5f5f5;
+}
+
+/* INPUT SELECT TAB */
+#fileSelector {
+    border-right: 1px solid var(--border-color);
+    position: relative;
+    width: 100px;
+}
+
+#fileSelector input {
+    border: none;
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+#fileSelector::after {
+    content: "▼";
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 12px;
+    color: var(--text-color-dark);
+}
+
+#fileSelector .dropdown {
+    position: absolute;
+    background-color: var(--secondary-bg);
+    top: 100%;
+    left: 0;
+    right: 0;
+    border: 1px solid var(--border-color);
+    max-height: 150px;
+    overflow-y: auto;
+    display: none;
+    z-index: 10;
+}
+
+#fileSelector .option {
+    padding: 10px;
+    cursor: pointer;
+}
+
+#fileSelector .option:hover {
+    background: var(--hover-color);
+}
+
+#gotoDiv {
+  border-left: 1px solid var(--border-color);
+  margin-left: auto;
+  display: flex;
+}
+
+#gotoDiv input {
+  text-align: center;
+  width: 100px;
+  padding: 10px;
+  border: none;
+  border-right: 1px solid var(--border-color);
+}
+
+#gotoDiv button {
+  border-left: 1px solid var(--border-color);
+  border: none;
+}
+

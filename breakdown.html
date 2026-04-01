@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RATELProf Visualize</title>
+<link rel="stylesheet" href="global/style/global.css">
+<link rel="stylesheet" href="global/style/components.css">
+<link rel="stylesheet" href="global/style/table.css">
+<link rel="stylesheet" href="global/style/tabs.css">
+
+<link rel="stylesheet" href="breakdown/style/breakdown.css">
+
+<script src="global/js/chart.js"></script>
+<script src="global/js/chart-label.js"></script>
+<script src="global/js/plotRendering.js"></script>
+
+<script src="global/js/splitView.js"></script>
+<script src="global/js/Table.js"></script>
+</head>
+<body>
+
+<div id="header">
+    <h1>RATELProf Visualization</h1>
+    <div>
+        <a href="index.html">Summary</a>
+        <!-- <a href="timeline.html">Timeline</a> -->
+        <a class="active" href="breakdown.html">Breakdown</a>
+        <a href="csv.html?type=statistics">Statistics</a>
+        <a href="csv.html?type=analyze">Analyze</a>
+    </div>
+</div>
+
+<div id="mainPanel">
+    <div class="tabs">
+        <a id="gpuButton" href="breakdown.html?type=gpu">GPU Breakdown</a>
+        <a id="cpuButton" href="breakdown.html?type=cpu">CPU Breakdown</a>
+    </div>
+    <div id="dividerPanel">
+        <div id="plotPanel"></div>
+        <div class="divider" id="divider"></div>
+        <div id="tablePanel">
+            <div id="controls">
+                <input type="checkbox" class="eye-toggle light" id="toggleVisibility">
+                <label class="light">
+                    <input type="radio" name="plt" value="heatmap" checked> Heatmap
+                </label>
+                <label class="light">
+                    <input type="radio" name="plt" value="histogram"> Histogram
+                </label>
+            </div>
+            <div id="tableContainer" class="scrollable"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const type = urlParams.get('type') ?? "gpu";
+    const script = document.createElement('script');
+    let datasets = null;
+    script.src = `data/breakdown_${type}.js`;
+    script.onload = () => {
+        const btn = document.getElementById(`${type}Button`).classList.add("active");
+        fillTable("tableContainer", __BREAKDOWN_DATA__)
+        datasets = transformBreakdownToDataset(__BREAKDOWN_DATA__)
+        setupRadios()
+    };
+    document.head.appendChild(script);
+</script>
+
+<script>
+const plotPanel = document.getElementById("plotPanel");
+enableSplitView("dividerPanel", "divider", "horizontal", (newSize) => {
+    plotPanel.style.height = newSize + "px";
+},)
+
+function fillTable(tableId, data) {
+    const container  = document.getElementById(tableId);
+    const table = new Table(container, { subgroupPadding: 24 });
+
+    function addRows(rows) {
+        rows.forEach(row => {
+            const { subrows, cells } = row;
+            const numberSubrow = subrows ? subrows.length : 0;
+            table.addRow(cells, { numberSubrow, collapsed: true });
+            
+            if (subrows) {
+                subrows.forEach(row => {
+                    table.addRow(row);
+                })
+            }
+        });
+    }
+
+    table.addRow(data.header, { isHeader: true });
+    addRows(data.rows);
+}
+
+const checkbox = document.getElementById("toggleVisibility")
+checkbox.addEventListener("change", e => {
+    const collapseAll = !e.target.checked;
+
+     document.querySelectorAll(".arrow").forEach(arrow => {
+        const isCollapsed = arrow.classList.contains("collapsed");
+        if (collapseAll !== isCollapsed) arrow.click();
+    });
+});
+
+window.addEventListener("DOMContentLoaded", () => {
+    checkbox.checked = false;
+});
+
+
+function handlePlotChange(value) {
+    if (value === 'heatmap') {
+        renderHeatmap(plotPanel, datasets)
+    } else if (value === 'histogram') {
+        renderMultibarHistogram(plotPanel, datasets);
+    }
+}
+
+function setupRadios() {
+    const radios = document.querySelectorAll('input[name="plt"]');
+
+    radios.forEach(radio => {
+        radio.addEventListener('change', () => handlePlotChange(radio.value));
+    });
+
+    const selectedRadio = document.querySelector('input[name="plt"]:checked');
+    if (selectedRadio) {
+        handlePlotChange(selectedRadio.value);
+    }
+}
+
+
+function transformBreakdownToDataset(data) {
+    const categories = data.header
+        .slice(3)
+        .map(h => h.replace(" (%)", "").replace(" Active Time", ""))
+
+    const labels = [];
+
+    const datasets = categories.map(label => ({ label, data: [] }));
+
+    data.rows.forEach(row => {
+        labels.push(row.cells[0]);
+        categories.forEach((_, i) => {
+            datasets[i].data.push(row.cells[i + 3]);
+        });
+    });
+
+    return { labels, datasets, xLabel: "Rank", yLabel: "Active time (%)" };
+}
+
+
+
+</script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+.csv-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+    font-family: sans-serif;
+    font-size: 12px;
+}
+
+.csv-pagination button {
+    padding: 5px 9px;
+}
+
+.csv-pagination select {
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 5px;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    background: var(--secondary-bg);
+}
+
+.csv-pagination label{
+    color: var(--text-color-dark);
+}
+
+
+#configPanel {
+    display: block;
+    background-color: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1em 1.2em;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    font-size: 14px;
+    color: var(--text-color-dark);
+}
+
+#configPanel .hidden-toggle-buttons {
+    white-space: nowrap;
+    gap: 5px;
+    width: 100%;
+    overflow: auto;
+    display: flex;
+    scrollbar-width: thin;
+    margin-bottom: 10px;
+}
+
+#configPanel .selector  {
+    display: flex;
+    margin-bottom: 10px;
+    align-items: center;
+    width: 350px;
+}
+
+#configPanel .selector label {
+    flex: 1;
+    margin-right: 0.5em;
+    color: var(--text-color-dark);
+    text-align: left;
+}
+
+#configPanel .selector select {
+    padding: 0.3em 0.5em;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    width: 200px;
+    background-color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}

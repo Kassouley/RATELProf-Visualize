@@ -1,0 +1,89 @@
+#treeView {
+    padding: 0 20px 0 0;
+    margin: 0;
+    font-size: 15px;
+    overflow: auto;
+    height: 100%;
+}
+
+/* remove default list spacing */
+#treeView ul {
+    margin: 0;
+    padding-left: 22px;
+    position: relative;
+}
+
+/* base list style */
+#treeView li {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-color-dark);
+}
+
+#treeView .tree-selected {
+    border-radius: 10px;
+    background: var(--hover-color);
+}
+
+/* ---------- FIRST LEVEL ---------- */
+
+.tree-1st-lvl {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border-color);
+    font-weight: 600;
+    background: var(--tree-bg, transparent);
+}
+
+.tree-1st-lvl:hover {
+    border-radius: 10px;
+    background: var(--hover-color);
+}
+
+/* ---------- SECOND LEVEL ---------- */
+
+.tree-2nd-lvl {
+    padding: 8px 10px 8px 18px;
+    position: relative;
+}
+
+.tree-2nd-lvl:hover {
+    border-radius: 10px;
+    background: var(--hover-color);
+}
+
+/* vertical connector */
+.tree-2nd-lvl::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: -8px;
+    width: 1px;
+    background: var(--border-color);
+}
+
+/* horizontal connector */
+.tree-2nd-lvl::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 14px;
+    height: 1px;
+    background: var(--border-color);
+}
+
+/* last child stops vertical line */
+#treeView ul li:last-child.tree-2nd-lvl::before {
+    bottom: 50%;
+}
+
+.tree-arrow {
+    display: inline-block;
+    font-size: 0.8em;
+    position: relative;
+    width: 16px; 
+    top: -2px;
+    padding: 8px;
+}
