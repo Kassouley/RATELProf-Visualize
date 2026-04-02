@@ -18,7 +18,8 @@ function createCSVtree(list) {
     if (!ul) return;
     ul.innerHTML = '';
 
-    list.forEach((item, fstIdx) => {
+
+    for (const [fstIdx, item] of Object.entries(list)) {
 
         const wrapperLi = document.createElement('li');
 
@@ -83,7 +84,7 @@ function createCSVtree(list) {
         }
 
         ul.appendChild(wrapperLi);
-    });
+    };
 
     ul.addEventListener('click', (e) => onTreeClick(e, list));
     
@@ -129,20 +130,28 @@ function onTreeClick(event, list) {
 
 
 function loadCSV(url, onLoad) {
-  const script = document.createElement("script");
-  script.src = url;
-  script.type = "text/javascript";
+    const csvContainer = document.getElementById("csvContainer")
+    const script = document.createElement("script");
+    if (!url) {
+        csvContainer.style.display = "none";
+        return;
+    }
+    
+    script.src = "../" + url;
+    script.type = "text/javascript";
 
-  script.onload = () => {
-    console.log("Script loaded:", url);
-    if (onLoad) onLoad();
-  };
+    script.onload = () => {
+        csvContainer.style.display = "flex";
+        console.log("CSV loaded:", url);
+        if (onLoad) onLoad();
+    };
 
-  script.onerror = () => {
-    console.error("Failed to load:", url);
-  };
+    script.onerror = () => {
+        csvContainer.style.display = "none";
+        console.error("Failed to load:", url);
+    };
 
-  document.head.appendChild(script);
+    document.head.appendChild(script);
 }
 
 
@@ -182,7 +191,7 @@ function createToggleButtons(header, config, displayHeader, displayRows) {
     const toggleButtonsContainer = configPanel.querySelector('.hidden-toggle-buttons');
     const { hiddenCols } = config;
     toggleButtonsContainer.innerHTML = '';
-    
+
     header.forEach((header, index) => {
         const btn = document.createElement('button');
         btn.classList.add(...(hiddenCols[index] ? ['collapsed', 'light'] : ['expanded']));
@@ -210,13 +219,15 @@ function createToggleButtons(header, config, displayHeader, displayRows) {
 }
 
 
-function createCSV(header, rows, config) {
+function createCSV(csvData, config) {
+    const headerArr = csvData[0]
+    const rows = csvData.slice(1)
     
     function displayHeader() {
         const { sortState, hiddenCols } = config;
         const headerRow = document.getElementById('headerRow');
         headerRow.innerHTML = '';
-        header.forEach((header, index) => {
+        headerArr.forEach((header, index) => {
             if (hiddenCols[index]) return;
             const th = document.createElement('th');
 
@@ -273,13 +284,13 @@ function createCSV(header, rows, config) {
                 const td = document.createElement('td');
 
                 if (typeof cell === 'number') {
-                    if (header[index].includes('(ns)')) {
+                    if (headerArr[index].includes('(ns)')) {
                         cell *= unitScales[timeunitSelect.selectedIndex];
-                    } else if (header[index].includes('(B)')) {
+                    } else if (headerArr[index].includes('(KB)')) {
                         cell *= unitScales[sizeunitSelect.selectedIndex];
                     }
 
-                    if (header[index].includes('(%)')) {
+                    if (headerArr[index].includes('(%)')) {
                         cell = cell.toFixed(2);
                     } else {
                         if (notationSelect.value === "Thousand Separator") {
@@ -297,7 +308,7 @@ function createCSV(header, rows, config) {
         });
     }
 
-    createToggleButtons(header, config, displayHeader, displayRows);
+    createToggleButtons(headerArr, config, displayHeader, displayRows);
 
     function onSearchTerm({target}) {
         config.searchTerm = target.value;
@@ -327,7 +338,7 @@ function showCSV(data) {
     const currentFile = data.file;
     const config = CONFIG[currentFile];
     loadCSV(currentFile, () => {
-        createCSV(window.currentCSV.header, window.currentCSV.rows, config);
+        createCSV(window.currentCSV, config);
     });
 }
 
