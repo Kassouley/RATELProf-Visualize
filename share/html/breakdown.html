@@ -57,7 +57,7 @@
     const type = urlParams.get('type') ?? "gpu";
     const script = document.createElement('script');
     let datasets = null;
-    script.src = `data/breakdown_${type}.js`;
+    script.src = `data/${type}_breakdown.js`;
     script.onload = () => {
         const btn = document.getElementById(`${type}Button`).classList.add("active");
         fillTable("tableContainer", __BREAKDOWN_DATA__)
@@ -77,22 +77,15 @@ function fillTable(tableId, data) {
     const container  = document.getElementById(tableId);
     const table = new Table(container, { subgroupPadding: 24 });
 
-    function addRows(rows) {
-        rows.forEach(row => {
-            const { subrows, cells } = row;
-            const numberSubrow = subrows ? subrows.length : 0;
-            table.addRow(cells, { numberSubrow, collapsed: true });
-            
-            if (subrows) {
-                subrows.forEach(row => {
-                    table.addRow(row);
-                })
-            }
-        });
-    }
+    table.addRow(data[0], { isHeader: true });
 
-    table.addRow(data.header, { isHeader: true });
-    addRows(data.rows);
+    for (let i = 1; i < data.length; i += 2) {
+        const row = data[i];
+        let subrows = data[i + 1];
+
+        table.addRow(row, { numberSubrow: subrows.length, collapsed: true });
+        subrows.forEach(sub => table.addRow(sub));
+    }
 }
 
 const checkbox = document.getElementById("toggleVisibility")
@@ -133,20 +126,21 @@ function setupRadios() {
 
 
 function transformBreakdownToDataset(data) {
-    const categories = data.header
+    const categories = data[0]
         .slice(3)
-        .map(h => h.replace(" (%)", "").replace(" Active Time", ""))
+        .map(h => h.replace(" (%)", "").replace(" Active Time", "").replace(" Time", ""))
 
     const labels = [];
 
     const datasets = categories.map(label => ({ label, data: [] }));
 
-    data.rows.forEach(row => {
-        labels.push(row.cells[0]);
-        categories.forEach((_, i) => {
-            datasets[i].data.push(row.cells[i + 3]);
+    for (let i = 1; i < data.length; i += 2) {
+        const row = data[i];
+        labels.push(row[0]);
+        categories.forEach((_, j) => {
+            datasets[j].data.push(row[j + 3]);
         });
-    });
+    }
 
     return { labels, datasets, xLabel: "Rank", yLabel: "Active time (%)" };
 }
