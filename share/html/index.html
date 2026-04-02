@@ -76,7 +76,7 @@ function fillGPUTable(tableId, data) {
         if (!newData) return;
 
         const script = document.createElement("script");
-        script.src = newData;
+        script.src = "../"+newData;
 
         script.onload = () => {
             container.innerHTML = "";
