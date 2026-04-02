@@ -24,7 +24,6 @@
     const type = urlParams.get('type');
 
     const configName = `${type}Config`; 
-    console.log(configName)
     let CONFIG = {};
     function saveConfig() {
         localStorage.setItem(configName, JSON.stringify(CONFIG));
@@ -77,7 +76,7 @@
     <div id="contentPanel" class="content-panel">
         <div class="top" id="topPanel"></div>
         <div id="divider"></div>
-        <div class="bottom">
+        <div class="bottom" id="csvContainer">
             <div class="tool-bar">
                 <input id="searchBar" placeholder="Search..." />
 
@@ -106,7 +105,7 @@
                     <label for="sizeunit">Size Unit:</label>
                     <select id="sizeunit">
                         <option>B</option>
-                        <option>KB</option>
+                        <option selected>KB</option>
                         <option>MB</option>
                         <option>GB</option>
                     </select>
