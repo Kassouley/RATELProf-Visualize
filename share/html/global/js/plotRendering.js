@@ -1,14 +1,9 @@
 const strongColors = [
-  "#e41a1c",
-  "#377eb8",
-  "#4daf4a",
-  "#ff7f00",
-  "#984ea3",
-  "#ffff33",
-  "#a65628"
+    "#e41a1c", "#377eb8", "#4daf4a", "#ff7f00",
+    "#984ea3", "#ffff33", "#a65628"
 ];
 
-const strongColorPlugin = {
+Chart.register({
     id: "strongColors",
     beforeDatasetsUpdate(chart) {
         if (chart.config._config.id === "histogram") {
@@ -18,9 +13,73 @@ const strongColorPlugin = {
             });
         }
     }
+});
+
+const legendTooltip = document.createElement('div');
+document.addEventListener('DOMContentLoaded', () => {
+    const l = legendTooltip;
+    l.id = 'legend-tooltip';
+    l.style.position = 'absolute';
+    l.style.background = 'rgba(0,0,0,0.7)';
+    l.style.color = '#fff';
+    l.style.padding = '4px 8px';
+    l.style.borderRadius = '4px';
+    l.style.pointerEvents = 'none';
+    l.style.fontSize = '12px';
+    l.style.display = 'none';
+    l.style.zIndex = 1000;
+    document.body.appendChild(legendTooltip);
+});
+
+const moveTooltip = (e) => {
+    legendTooltip.style.left = e.clientX + 10 + 'px';
+    legendTooltip.style.top = e.clientY + 10 + 'px';
 };
 
-Chart.register(strongColorPlugin);
+const hideTooltip = () => {
+    legendTooltip.style.display = "none";
+    document.removeEventListener('mousemove', moveTooltip);
+};
+
+const displayTooltip = (content) => {
+    if (!content) return;
+    legendTooltip.innerText = content;
+    legendTooltip.style.display = "block";
+    document.addEventListener('mousemove', moveTooltip);
+};
+
+Chart.register({
+    id: 'truncateLegend',
+    beforeInit(chart) {
+        const MAX_SIZE = 15;
+
+        const legend = chart.options.plugins.legend
+        if (!legend) return;
+
+        const legendOptions = legend.labels;
+        const originalFn = legendOptions.generateLabels;
+        chart.canvas.addEventListener('mouseout', hideTooltip);
+
+        legendOptions.generateLabels = function (chart) {
+            const labels = originalFn(chart);
+
+            labels.forEach(label => {
+                if (label.text.length > MAX_SIZE) {
+                label._fullText = label.text;
+                label.text = label.text.substring(0, MAX_SIZE) + '...';
+                }
+            });
+
+            return labels;
+        };
+
+        legend.onHover = function (_, legendItem) {
+            displayTooltip(legendItem._fullText);
+        };
+
+        legend.onLeave = hideTooltip;
+    }
+});
 
 /* ============================= */
 /* ======= HISTOGRAM ============ */
@@ -49,11 +108,20 @@ function renderHistogram(container, data) {
                 }
             },
             plugins: {
-                legend: { position: 'bottom' },
+                title: data.title && {
+                    display: true,
+                    text: data.title,
+                    font: { size: 12 },
+                    padding: { top: 10, bottom: 10 }
+                },
+                legend: { 
+                    display: true,
+                    position: 'bottom'
+                },
                 tooltip: {
                     callbacks: {
                         label({dataset, raw}) {
-                            return `${dataset.label} coverage: ${raw}%`;
+                            return `${dataset.label}: ${raw}%`;
                         }
                     }
                 }
@@ -111,7 +179,7 @@ function renderPie(container, plotData, index) {
                 tooltip: {
                     callbacks: {
                         label({raw}) {
-                            return `Coverage: ${raw}%`;
+                            return `${raw}%`;
                         }
                     }
                 }
@@ -330,8 +398,7 @@ function renderHeatmap(container, data) {
             }
           }
         }
-      },
-      plugins: [ChartDataLabels]
+      }
     });
 
   const checkbox = document.getElementById("pctCheckbox");

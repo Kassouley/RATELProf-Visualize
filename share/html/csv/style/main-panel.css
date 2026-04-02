@@ -34,28 +34,41 @@
 }
 
 .top {
-    height: 25%;
+    height: 50%;
     width: 100%;
-    overflow-y: auto;
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
-.advice {
+.scroll-container {
     height: 100%;
     flex: 1;
-    display: flex;
-}
-.advice p {
-    white-space: pre-wrap;
-    word-break: break-all;
+    position: relative;
+    overflow: auto;
 }
 
-.advice div {
+
+.advice {
+    min-height: 100%; 
+    font-family: monospace;
+    display: flex;
+    align-items: stretch;
+}
+
+.advice p {
+    white-space: pre-wrap;
+}
+
+.advice > div {
+    padding-right: 30px;
     flex: 1;
 }
 
+.advice > div + div {
+    padding-left: 30px;
+    border-left: 1px solid var(--border-color);
+}
 
 #divider {
     position: relative;
@@ -75,7 +88,7 @@
 
 .bottom {
     flex: 1;
-    display: flex;
+    display: none;
     flex-direction: column;
     min-height: 0;
 }
