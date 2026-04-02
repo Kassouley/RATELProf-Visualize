@@ -1,9 +1,12 @@
 class Table {
-    constructor(container, options = {}) {
-        const { id = "", subgroupPadding = 36 } = options;
+    constructor(container, {
+        id, subgroupPadding = 36, max_len = 64
+    } = {}) {
         this.subgroupPadding = subgroupPadding;
         this.groupCounter = 1;
         this.pendingGroup = [];
+        this.max_len = max_len;
+
 
         this.table = document.createElement("table");
 
@@ -63,6 +66,12 @@ class Table {
             cell.colSpan = colspan[idx] || 1;
             cell.style.paddingLeft = `${5 + this.subgroupPadding * depth}px`;
 
+            let displayContent = content;
+            if (content.length > this.max_len) {
+                displayContent = content.slice(0, this.max_len) + '...';
+                cell.title = content; // Full content shown on hover
+            }
+
             if (idx === 0) {
                 const fragment = document.createDocumentFragment();
                 const placeholder = document.createElement("span");
@@ -81,9 +90,9 @@ class Table {
                     fragment.append(tooltipSpan, document.createTextNode(" "));
                 }
 
-                fragment.appendChild(document.createTextNode(content));
+                fragment.appendChild(document.createTextNode(displayContent));
                 cell.appendChild(fragment);
-            } else cell.textContent = content;
+            } else cell.textContent = displayContent;
 
             tr.appendChild(cell);
         });
