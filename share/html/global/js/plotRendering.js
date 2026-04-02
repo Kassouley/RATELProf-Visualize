@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     l.style.fontSize = '12px';
     l.style.display = 'none';
     l.style.zIndex = 1000;
+    l.style.wordBreak = 'break-word';
+    l.style.overflowWrap = 'break-word';
     document.body.appendChild(legendTooltip);
 });
 
@@ -356,49 +358,50 @@ function renderHeatmap(container, data) {
     const yLabels = data.datasets.map(d => d.label);
 
     const chart = new Chart("canvasHeatmap", {
-      type: "bar",
-      data: { labels, datasets }, 
-      options: {
-        responsive:true,
-        maintainAspectRatio:false,
+        type: "bar",
+        data: { labels, datasets }, 
+        options: {
+            responsive:true,
+            maintainAspectRatio:false,
 
-        plugins: {
-          datalabels: {
-            display: false,
-            color: '#000',
-            anchor: 'center',
-            align: 'center',
-            formatter: (_, ctx) => getPercentage(ctx, data)
-          },
+            plugins: {
+            datalabels: {
+                display: false,
+                color: '#000',
+                anchor: 'center',
+                align: 'center',
+                formatter: (_, ctx) => getPercentage(ctx, data)
+            },
 
-          legend:{ display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => `${ctx.dataset.label}: ${getPercentage(ctx, data)}%`
+            legend:{ display: false },
+                tooltip: {
+                    callbacks: {
+                    label: (ctx) => `${ctx.dataset.label}: ${getPercentage(ctx, data)}%`
+                    }
+                }
+            }, 
+            
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: { display: false },
+                },
+
+                y: {
+                    beginAtZero: true,
+                    stacked: true,
+                    grid: { display: false },
+                    min: 0,
+                    ticks: {
+                        count: (yLabels.length * 2 + 1),
+                        callback(value, index) {
+                            return Number.isInteger(value) ? null : yLabels[Math.floor(value)]
+                        }
+                    }
+                }
             }
-          }
-        }, 
-        
-        scales: {
-          x: {
-            stacked: true,
-            grid: { display: false },
-          },
-
-          y: {
-            beginAtZero: true,
-            stacked: true,
-            grid: { display: false },
-            min: 0,
-            ticks: {
-              count: (yLabels.length * 2 + 1),
-              callback(value, index) {
-                return Number.isInteger(value) ? null : yLabels[Math.floor(value)]
-              }
-            }
-          }
-        }
-      }
+        },
+        plugins: [ChartDataLabels]
     });
 
   const checkbox = document.getElementById("pctCheckbox");

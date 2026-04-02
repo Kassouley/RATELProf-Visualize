@@ -136,7 +136,7 @@ function loadCSV(url, onLoad) {
         csvContainer.style.display = "none";
         return;
     }
-    
+
     script.src = "../" + url;
     script.type = "text/javascript";
 
@@ -301,7 +301,13 @@ function createCSV(csvData, config) {
                     }
                 }
 
-                td.textContent = cell;
+                let displayCell = cell;
+                if (cell.length > 64) {
+                    displayCell = cell.slice(0, 64) + '...';
+                    td.title = cell; // Full cell shown on hover
+                }
+
+                td.textContent = displayCell;
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
