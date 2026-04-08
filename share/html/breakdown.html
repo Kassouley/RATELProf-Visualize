@@ -52,19 +52,42 @@
     </div>
 </div>
 
+
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const type = urlParams.get('type') ?? "gpu";
+const urlParams = new URLSearchParams(window.location.search);
+let type = urlParams.get('type') ?? "gpu";
+
+let datasets = null;
+
+function loadScript(currentType, hasRetried = false) {
     const script = document.createElement('script');
-    let datasets = null;
-    script.src = `data/${type}_breakdown.js`;
+    script.src = `data/${currentType}_breakdown.js`;
+
     script.onload = () => {
-        const btn = document.getElementById(`${type}Button`).classList.add("active");
-        fillTable("tableContainer", __BREAKDOWN_DATA__)
-        datasets = transformBreakdownToDataset(__BREAKDOWN_DATA__)
-        setupRadios()
+        document.getElementById(`${currentType}Button`)?.classList.add("active");
+
+        fillTable("tableContainer", __BREAKDOWN_DATA__);
+        datasets = transformBreakdownToDataset(__BREAKDOWN_DATA__);
+        setupRadios();
     };
-    document.head.appendChild(script);
+
+    script.onerror = () => {
+        if (!hasRetried) {
+            // fallback to the other type
+            const fallbackType = currentType === "cpu" ? "gpu" : "cpu";
+            alert(`Your profiling report doesn't contain ${currentType.toUpperCase()} breakdown data.`);
+            console.warn(`Failed to load ${currentType}, trying ${fallbackType}...`);
+            loadScript(fallbackType, true);
+        } else {
+            alert(`Your profiling report doesn't contain CPU or GPU breakdown data.`);
+        }
+    };
+
+    document.body.appendChild(script);
+}
+
+// initial load
+loadScript(type);
 </script>
 
 <script>

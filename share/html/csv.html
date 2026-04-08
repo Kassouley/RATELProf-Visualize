@@ -20,6 +20,12 @@
 <script src="csv/js/textRendering.js"></script>
 <script src="csv/js/csv.js"></script>
 <script>
+    function isEmpty(obj) {
+        if (!obj) return true; 
+        if (Array.isArray(obj)) return obj.length === 0;
+        if (typeof obj === 'object') return Object.keys(obj).length === 0;
+        return false;
+    }
     const urlParams = new URLSearchParams(window.location.search);
     const type = urlParams.get('type');
 
@@ -44,7 +50,11 @@
     const script = document.createElement('script');
     script.src = `data/${type}.js`;
     script.onload = () => {
-        createCSVtree(__CSV_DATA__);
+        if (isEmpty(__CSV_DATA__)) {
+            alert("This page does not contain any CSV data to display.");
+        } else {
+            createCSVtree(__CSV_DATA__);
+        }
     };
     document.head.appendChild(script);
 </script>
