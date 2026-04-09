@@ -38,7 +38,7 @@ button.expanded::before {
   display: inline-block; 
   cursor: pointer;
   user-select: none;
-  transform: rotate(0deg);
+  transform: rotate(90deg) translate(25%, 0);
 }
 
 .arrow::before {
@@ -46,14 +46,14 @@ button.expanded::before {
 }
 
 .arrow.collapsed {
-  transform: rotate(90deg) translate(25%, 0);
+  transform: rotate(0deg);
 }
 
 
 .eye-toggle {
   --eye-size: 1.8rem;       /* size of the eye */
-  --eye-color: var(--text-color-dark);     /* color of the eye */
-  --slash-color: red;     /* color of the slash */
+  --eye-color: var(--text-color-dark); /* color of the eye */
+  --slash-color: red;        /* color of the slash */
 
   appearance: none;
   cursor: pointer;
@@ -65,26 +65,28 @@ button.expanded::before {
 
 /* Eye */
 .eye-toggle::before {
-  content: "👁";
+  content: "";
   position: absolute;
-  top: 42%;
+  top: 50%;
   left: 50%;
+  width: calc(var(--eye-size) * 0.8);
+  height: calc(var(--eye-size) * 0.8);
   transform: translate(-50%, -50%);
-  font-size: var(--eye-size);
-  color: var(--eye-color);
-  line-height: 1;
+  background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAgMTIwIj48cGF0aCBkPSJNNjAsMjAgQzMwLDIwLDAsNjAsMCw2MFMzMCwxMDAgNjAsMTAwUzEyMCw2MCAxMjAsNjBTOTAsMjAgNjAsMjB6IiBmaWxsPSJ3aGl0ZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSI4Ii8+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iMTUiIGZpbGw9ImJsYWNrIi8+PC9zdmc+") no-repeat center / contain;
+  display: block;
 }
 
 /* Slash overlay */
 .eye-toggle::after {
   content: "/";
   position: absolute;
-  top: 45%;
+  top: 50%;
   left: 50%;
-  transform: translate(-25%, -50%) rotate(45deg);
-  font-size: var(--eye-size);
+  transform: translate(-50%, -50%) rotate(45deg);
+  font-size: calc(var(--eye-size) * 1.2);
   color: var(--slash-color);
   line-height: 1;
+  pointer-events: none;
 }
 
 /* Hide slash when checked */

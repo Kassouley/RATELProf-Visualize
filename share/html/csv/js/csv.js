@@ -50,6 +50,7 @@ function createCSVtree(list) {
             const subUl = document.createElement('ul');
             subUl.style.display = "none"; // collapsed by default
             arrow.classList.add('arrow');
+            arrow.classList.add('collapsed');
 
             item.subCSV.forEach((subLvl, subIdx) => {
 

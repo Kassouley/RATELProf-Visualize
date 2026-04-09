@@ -148,13 +148,13 @@ class Table {
        arrow.addEventListener("click", e => {
             e.stopPropagation();
 
+            arrow.classList.toggle("collapsed");
+            tr.classList.toggle("expanded");
+
             const groupRows = this.tbody.querySelectorAll(`.group-${groupId}`);
-            const shouldShow = arrow.classList.contains("collapsed");
+            const shouldShow = !arrow.classList.contains("collapsed");
 
             groupRows.forEach(r => r.style.display = shouldShow ? "table-row" : "none");
-
-            arrow.classList.toggle("collapsed", !shouldShow);
-            tr.classList.toggle("expanded", shouldShow);
 
             this.__applyAlternateColors();
         });

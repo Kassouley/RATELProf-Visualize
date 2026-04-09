@@ -366,18 +366,18 @@ function renderHeatmap(container, data) {
             maintainAspectRatio:false,
 
             plugins: {
-            datalabels: {
-                display: false,
-                color: '#000',
-                anchor: 'center',
-                align: 'center',
-                formatter: (_, ctx) => getPercentage(ctx, data)
-            },
+                datalabels: {
+                    display: false,
+                    color: '#000',
+                    anchor: 'center',
+                    align: 'center',
+                    formatter: (_, ctx) => getPercentage(ctx, data)
+                },
 
-            legend:{ display: false },
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
-                    label: (ctx) => `${ctx.dataset.label}: ${getPercentage(ctx, data)}%`
+                        label: (ctx) => `${ctx.dataset.label}: ${getPercentage(ctx, data)}%`
                     }
                 }
             }, 
