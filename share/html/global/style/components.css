@@ -35,9 +35,10 @@ button.expanded::before {
 }
 
 .arrow {
+  display: inline-block; 
   cursor: pointer;
   user-select: none;
-  transform: rotate(90deg);
+  transform: rotate(0deg);
 }
 
 .arrow::before {
@@ -45,7 +46,7 @@ button.expanded::before {
 }
 
 .arrow.collapsed {
-  transform: rotate(0deg);
+  transform: rotate(90deg) translate(25%, 0);
 }
 
 

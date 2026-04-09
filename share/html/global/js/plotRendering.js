@@ -8,8 +8,9 @@ Chart.register({
     beforeDatasetsUpdate(chart) {
         if (chart.config._config.id === "histogram") {
             chart.data.datasets.forEach((ds, i) => {
+                if (ds.label == "others") ds.backgroundColor = '#636363'
+                else ds.backgroundColor = strongColors[i % strongColors.length]; 
                 // If needed, when can change according to name too
-                ds.backgroundColor = strongColors[i % strongColors.length]; 
             });
         }
     }

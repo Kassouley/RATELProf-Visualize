@@ -1,15 +1,17 @@
 #treeView {
-    padding: 0 20px 0 0;
+    padding: 0 10px 0 0;
     margin: 0;
-    font-size: 15px;
+    font-size: 13px;
     overflow: auto;
     height: 100%;
+    display:flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 /* remove default list spacing */
 #treeView ul {
     margin: 0;
-    padding-left: 22px;
     position: relative;
 }
 
@@ -22,33 +24,32 @@
 }
 
 #treeView .tree-selected {
-    border-radius: 10px;
-    background: var(--hover-color);
+    background: var(--primary-color);
+    color: var(--text-color-light);
 }
 
 /* ---------- FIRST LEVEL ---------- */
 
 .tree-1st-lvl {
-    padding: 10px 12px;
-    border-top: 1px solid var(--border-color);
-    font-weight: 600;
-    background: var(--tree-bg, transparent);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--primary-bg);
 }
 
 .tree-1st-lvl:hover {
-    border-radius: 10px;
     background: var(--hover-color);
 }
 
 /* ---------- SECOND LEVEL ---------- */
 
 .tree-2nd-lvl {
-    padding: 8px 10px 8px 18px;
+    border-radius: 8px;
+    margin-top: 4px;
+    padding: 5px 6px;
     position: relative;
 }
 
 .tree-2nd-lvl:hover {
-    border-radius: 10px;
     background: var(--hover-color);
 }
 
@@ -56,7 +57,7 @@
 .tree-2nd-lvl::before {
     content: "";
     position: absolute;
-    left: 0;
+    left: -15px;
     top: 0;
     bottom: -8px;
     width: 1px;
@@ -67,9 +68,9 @@
 .tree-2nd-lvl::after {
     content: "";
     position: absolute;
-    left: 0;
+    left: -15px;
     top: 50%;
-    width: 14px;
+    width: 15px;
     height: 1px;
     background: var(--border-color);
 }
@@ -79,11 +80,6 @@
     bottom: 50%;
 }
 
-.tree-arrow {
-    display: inline-block;
-    font-size: 0.8em;
-    position: relative;
-    width: 16px; 
-    top: -2px;
-    padding: 8px;
+.arrow {
+    padding-right: 5px;
 }

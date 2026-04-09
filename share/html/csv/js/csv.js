@@ -31,12 +31,7 @@ function createCSVtree(list) {
 
         // Arrow
         const arrow = document.createElement('span');
-        arrow.className = 'tree-arrow';
-        arrow.textContent = '▶';
-        if (!item.subCSV || item.subCSV.length == 0) {
-            arrow.textContent = '';
-        }
-
+      
         // Title
         const title = document.createElement('span');
         title.textContent = item.name;
@@ -50,10 +45,11 @@ function createCSVtree(list) {
 
         /* ---------- SECOND LEVEL ---------- */
 
-        if (item.subCSV && Array.isArray(item.subCSV)) {
+        if (item.subCSV && Array.isArray(item.subCSV) && item.subCSV.length > 0) {
 
             const subUl = document.createElement('ul');
             subUl.style.display = "none"; // collapsed by default
+            arrow.classList.add('arrow');
 
             item.subCSV.forEach((subLvl, subIdx) => {
 
@@ -79,7 +75,7 @@ function createCSVtree(list) {
                 const isOpen = subUl.style.display === "block";
 
                 subUl.style.display = isOpen ? "none" : "block";
-                arrow.textContent = isOpen ? "▶" : "▼";
+                arrow.classList.toggle("collapsed");
             });
         }
 
