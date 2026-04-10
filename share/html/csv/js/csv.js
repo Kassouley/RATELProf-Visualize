@@ -134,7 +134,7 @@ function loadCSV(url, onLoad) {
         return;
     }
 
-    script.src = "../" + url;
+    script.src = `data/csv/${type}/${url}`;
     script.type = "text/javascript";
 
     script.onload = () => {
