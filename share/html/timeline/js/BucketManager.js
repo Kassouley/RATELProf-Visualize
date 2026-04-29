@@ -8,19 +8,22 @@ class BucketManager {
         onInit,
         onRequestSucceed,
         onEventClick,
+        onMetadataReady,
         trackHeight,
         eventHeight,
         maxLoadedBuckets,
         viewPadding,
         getEventTooltip,
         maxTime,
+        maxBucketSize,
         yOffset = 0,
     }) {
         this.loadedBucket = {};
 
-        this.startIndices = Uint32Array.from({ length: 10000 + 1 }, (_, i) => i * 4);
+        this.startIndices = Uint32Array.from({ length: maxBucketSize + 1 }, (_, i) => i * 4);
         
         this.getEventTooltip = getEventTooltip;
+        this.onMetadataReady = onMetadataReady;
 
         this.handleClick = (bucket) => (info, event) => {
             const object = bucket.events[info.index];
@@ -42,6 +45,11 @@ class BucketManager {
             } else if (e.data.requestSucceeded) {
                 this.isRequestingRender = false;
                 onRequestSucceed();
+            } else if (e.data.onMetadataReady) {
+                const { metadata } = e.data;
+                if (this.onMetadataReady) {
+                    this.onMetadataReady(metadata);
+                }
             }
         };
 
@@ -68,6 +76,11 @@ class BucketManager {
 
         this.worker.postMessage({ action: "requestRender", 
             start: viewStart, end: viewStop });
+    }
+
+    requestMetadata(event) {
+        this.worker.postMessage({ action: "requestMetadata", 
+            event: event });
     }
 
 
@@ -114,8 +127,13 @@ class BucketManager {
         }
         const e = layer.props.data.properties[index];
         if (e) {
-            const x = event.center.x + 10;
-            const y = event.center.y + 10;
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const off = 10;
+            let x = event.center.x + off;
+            let y = event.center.y + off;
+            if (x + tooltipRect.width > window.innerWidth) {
+                x = window.innerWidth - tooltipRect.width - off;
+            } // Prevent right overflow
             tooltip.style.display = 'block';
             tooltip.style.left = `${x}px`;
             tooltip.style.top = `${y}px`;

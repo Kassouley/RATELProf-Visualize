@@ -3,12 +3,11 @@ const IS_LOCAL = location.protocol === 'file:';
 class FileManager {
     constructor({
         folderButton,
-        path = ".",
-        folderName = "events",
+        path = "./",
         handleFile,
     } = {}) {
         this.path = path
-        this.folderName = folderName;
+        this.folderName = path.split('/').pop();
         this.handleFile = handleFile;
         this.fileMapforLocal = {};
         this.readyToLoad = !IS_LOCAL;
@@ -22,16 +21,22 @@ class FileManager {
 
     async openFile(filename) {
         if (!this.readyToLoad) return;
+        
         try {
             let file;
+
+            const start = performance.now();
             if (IS_LOCAL) {
                 file = this.fileMapforLocal[filename];
-            } else /*IS_SERVER*/ {
-                const res = await fetch(`${this.path}/${this.folderName}/${filename}`);
+            } else { // IS_SERVER
+                const res = await fetch(`${this.path}/${filename}`);
                 if (res.ok) file = await res.blob();
             }
+            const end = performance.now();
+            console.log(`[openFile] ${filename} load time: ${(end - start).toFixed(2)} ms`);
 
             if (!file) throw new Error(`File ${filename} not found`);
+
             this.handleFile(file);
         } catch (err) {
             alert('Error fetching file: ' + err.message);
@@ -76,7 +81,7 @@ class FileManager {
         const text = document.createElement('p');
         text.innerHTML = `You are running in <strong>local mode (file:)</strong>.<br>
             Due to browser security restriction, to load trace data, you must manually select the folder containing the files and grant access.<br>
-            Please select the folder named <strong>${PATH}/${FOLDER_NAME}</strong>.<br><br>
+            Please select the folder named <strong>${this.path}</strong>.<br><br>
             In <strong>server mode</strong>, this step is not required.`
 
         container.appendChild(text);

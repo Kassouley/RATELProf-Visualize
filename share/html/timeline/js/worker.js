@@ -4,7 +4,7 @@
 
 const CONFIG = {
   bucketSize: 10_000,
-  eventCount: 10_000_000,
+  eventCount: 10_000,
   groupCount: 5,
   trackCount: 3,
   subtrackCount: 2,
@@ -43,6 +43,24 @@ function hashStringToLightColor(str) {
     return color;
 }
 
+function numberToLightColor(n) {
+    const cached = hashColorCache.get(n);
+    if (cached !== undefined) return cached;
+
+    let hash = n | 0;
+
+    hash = (hash ^ (hash >>> 16)) * 0x45d9f3b;
+    hash = (hash ^ (hash >>> 16)) * 0x45d9f3b;
+    hash = hash ^ (hash >>> 16);
+
+    const r = ((hash        & 0xFF) >>> 1) + 128;
+    const g = ((hash >>> 8  & 0xFF) >>> 1) + 128;
+    const b = ((hash >>> 16 & 0xFF) >>> 1) + 128;
+
+    const color = [r, g, b];
+    hashColorCache.set(n, color);
+    return color;
+}
 
 // ============================
 // RANDOM GENERATOR
@@ -196,4 +214,5 @@ function generateBucketMetadata() {
 // BUCKET MANAGER
 // ============================
 
-importScripts('./RProf_Vis.js');
+importScripts('./MSGPackDecoder.js');
+importScripts('./RProfVis.js');

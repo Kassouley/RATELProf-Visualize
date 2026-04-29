@@ -47,7 +47,7 @@ class SelectInput {
 
         if (this.defaultselect !== null 
                 && this.options.length - 1 === this.defaultselect) {
-            this.input.value = option;
+            this.input.value = option.name;
             if (this.onSelect) this.onSelect(option, this.defaultselect);
         }
     }
@@ -67,10 +67,10 @@ class SelectInput {
         list.forEach(item => {
             const div = document.createElement('div');
             div.className = 'option';
-            div.textContent = item;
+            div.textContent = item.name;
 
             div.onclick = () => {
-                this.input.value = item;
+                this.input.value = item.name;
                 this.dropdown.style.display = 'none';
                 const index = this.options.indexOf(item);
                 if (this.onSelect) this.onSelect(item, index);

@@ -41,7 +41,7 @@ class GroupGL {
         this.tracks.forEach(track => {
             const label = document.createElement('div');
             label.className = 'track-label';
-            label.textContent = track.name ?? `Track ${i + 1}`;
+            label.textContent = track.name;
             label.style.height = `${track.height}px`;
             trackLabels.appendChild(label);
         });
@@ -131,8 +131,13 @@ class GroupGL {
         if (!this.getHistogramTooltip) return;
         const tooltip = document.getElementById('timeline-tooltip');
         if (object) {
-            const x = event.center.x + 10;
-            const y = event.center.y + 10;
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const off = 10;
+            let x = event.center.x + off;
+            let y = event.center.y + off;
+            if (x + tooltipRect.width > window.innerWidth) {
+                x = window.innerWidth - tooltipRect.width - off;
+            } // Prevent right overflow
             tooltip.style.display = 'block';
             tooltip.style.left = `${x}px`;
             tooltip.style.top = `${y}px`;

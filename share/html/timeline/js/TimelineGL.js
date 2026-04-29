@@ -1,22 +1,5 @@
 // TimelineGL.js
 
-function formatTime(t) {
-    t = Math.floor(t);
-    if (t === 0) return '0 ns';
-
-    let ns = t % 1000;
-    let us = Math.floor(t / 1e3) % 1000;
-    let ms = Math.floor(t / 1e6) % 1000;
-    let s  = Math.floor(t / 1e9);
-
-    let parts = [];
-    if (s) parts.push(s + 's');
-    if (ms) parts.push(ms + 'ms');
-    if (us) parts.push(us + 'µs');
-    if (ns) parts.push(ns + 'ns');
-
-    return parts.join(' ');
-}
 
 class TimelineGL {
     constructor(containerId, {
@@ -33,8 +16,10 @@ class TimelineGL {
                 getEventTooltip,
                 getHistogramTooltip,
                 onEventClick,
+                onTimelineInit,
                 initialView = [minTime, maxTime],
                 maxLoadedBuckets = 100,
+                maxBucketSize = 10000,
                 viewPadding = 10000
             } = {}) {
 
@@ -47,17 +32,20 @@ class TimelineGL {
         this.groupLabelHeight = groupLabelHeight;
         this.minUserZoom = minZoom;
         this.maxUserZoom = maxZoom;
+        this.maxBucketSize = maxBucketSize;
         this.getEventTooltip = getEventTooltip;
         this.getHistogramTooltip = getHistogramTooltip;
         this.initialView = initialView;
         this.maxLoadedBuckets = maxLoadedBuckets;
         this.viewPadding = viewPadding;
         this.onEventClick = onEventClick;
-
+        this.onTimelineInit = onTimelineInit;
         this.viewStart = this.initialView[0];
         this.viewStop  = this.initialView[1];
 
         this.scrollOffset = 0;
+        this.lastClickedEvent = null;
+
         this.createTooltip();
         
         this.highlightPolygons = [{polygon: new Array(8).fill(-1)}];
@@ -95,7 +83,8 @@ class TimelineGL {
             eventHeight,
             maxLoadedBuckets,
             viewPadding,
-            maxTime
+            maxTime,
+            maxBucketSize
         } = this;
 
         const groupOpt = {
@@ -113,6 +102,7 @@ class TimelineGL {
             viewPadding,
             getEventTooltip,
             maxTime,
+            maxBucketSize,
             onInit: ({maxTime, groups}) => {
                 this.maxTime = maxTime;
                 this.maxVisibleRange = this.minUserZoom ?? maxTime;
@@ -127,17 +117,30 @@ class TimelineGL {
                 this.originalHeight = this.timelineHeight;
 
                 this.initializeGL();
+                if (this.onTimelineInit) this.onTimelineInit(this);
             },
 
             onRequestSucceed: () => {
                 this.renderLayers();
             },
 
+            onMetadataReady: (metadata) => {
+                if (this.onEventClick) this.onEventClick(this.lastClickedEvent, metadata);
+            },
+
             onEventClick: (object, index, bucket, event) => {
+                if (!object) return;
                 if (event.type === "dblclick") {
                     this.gotoView(object[START], object[STOP]);
                 }
-                if(this.onEventClick) this.onEventClick(object);
+                
+                // Store the clicked event for metadata handling
+                this.lastClickedEvent = object;
+                
+                // Request metadata from the worker
+                this.bucketManager.requestMetadata(object);
+                
+                // Highlight the polygon
                 const eventStride = 8;
                 const eventOffset = index * eventStride
                 const polygon = bucket.polygonBuffer.subarray(eventOffset, eventOffset + eventStride);
@@ -206,6 +209,7 @@ class TimelineGL {
 
     setTimelineHeight(height) {
         height = height ?? this.mainContainer.clientHeight;
+        this.mainContainer.style.height = `${height}px`;
         height -= this.axisOptions.height; 
         this.globalViewHeight = height;
         this.trackLabelContainer.style.height = `${height}px`;
@@ -325,6 +329,7 @@ class TimelineGL {
             onDrag:      (i, e) => this.onDrag(i, e),
             onDragEnd:   (i, e) => this.onDragEnd(i, e),
             onClick: (info, event) => {
+                if (!info || !info.viewport) return;
                 if (info.viewport.id.includes("histogram")) {
                     const center = this.scaleXFromHistogramToTimeline(info.coordinate[0]);
                     this.syncView(center);
@@ -366,14 +371,23 @@ class TimelineGL {
             },
 
         });
+
+        let defaultHeight = this.mainContainer.clientHeight;
+        let idealHeight = this.timelineHeight + this.axisOptions.height;
+        if (defaultHeight > idealHeight) {
+            defaultHeight = idealHeight;
+        }
         this.setTimelineWidth();
-        this.setTimelineHeight();
+        this.setTimelineHeight(defaultHeight);
         
         this.updateViews();
         this.requestRender();
 
     }
 
+    requestMetadata(event) {
+        this.bucketManager.requestMetadata(event);
+    }
 
     requestRender() {
         this.bucketManager.requestRender(this.viewStart, this.viewStop);
@@ -397,11 +411,13 @@ class TimelineGL {
         const y = this.groupLabelHeight;
         const scaledStart = this.scaleXFromTimelineToHistogram(this.viewStart);
         const scaledStop  = this.scaleXFromTimelineToHistogram(this.viewStop);
-        return new deck.SolidPolygonLayer({
+        return new deck.PolygonLayer({
             id: '__internal-preview-range',
             data: [[scaledStart, scaledStop]],
             getPolygon: e => this.getRangePolygon(e, 0, -y),
-            getFillColor: [255, 255, 0, 64],
+            lineWidthUnits: "pixels",
+            getLineColor: [255, 255, 0],
+            getFillColor: [255, 255, 0, 32],
         })
     }
 
@@ -673,7 +689,7 @@ class TimelineGL {
         const {
             axisAlign = 'bottom',
             axisHeight = 50,
-            axisTimeFormat = formatTime,
+            axisTimeFormat = (t) => t,
             axisColor = '#ffffff',
             axisFont = 'Arial',
             axisFontSize = 12,
@@ -787,7 +803,7 @@ class TimelineGL {
 
             const head = 6;
 
-            const label = formatTime(stop - start);
+            const label = format(stop - start);
 
             ctx.strokeStyle = color;
             ctx.fillStyle = color;

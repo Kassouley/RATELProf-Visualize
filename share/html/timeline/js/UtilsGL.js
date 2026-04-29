@@ -1,11 +1,14 @@
 // UtilsGL.js
 
-const NAME = 0
-const START = 1;
-const STOP = 2;
+const START = 0;
+const STOP = 1;
+const GROUP = 2;
 const TRACK = 3;
 const SUBTRACK = 4;
-const GROUP = 5;
+const METAOFF = 5;
+const METASIZE = 6;
+const NAME = 7;
+
 
 const hashColorCache = new Map();
 

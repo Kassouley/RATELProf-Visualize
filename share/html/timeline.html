@@ -20,11 +20,10 @@
 <script src="timeline/js/GroupGL.js"></script>
 <script src="timeline/js/BucketManager.js"></script>
 <script src="timeline/js/TimelineGL.js"></script>
-<script src="timeline/js/utils.js"></script>
 
-<script src="timeline/js/timeInput.js"></script>
-<script src="timeline/js/selectInput.js"></script>
-<script src="timeline/js/fileManager.js"></script>
+<script src="timeline/js/TimeInput.js"></script>
+<script src="timeline/js/SelectInput.js"></script>
+<script src="timeline/js/FileManager.js"></script>
 
 <script src="data/timeline.js"></script>
 
@@ -135,29 +134,54 @@
 
     changeTab(null, "event");
 
+
+    function formatTime(t) {
+        t = Math.floor(t);
+        if (t === 0) return '0 ns';
+
+        let ns = t % 1000;
+        let us = Math.floor(t / 1e3) % 1000;
+        let ms = Math.floor(t / 1e6) % 1000;
+        let s  = Math.floor(t / 1e9);
+
+        let parts = [];
+        if (s) parts.push(s + 's');
+        if (ms) parts.push(ms + 'ms');
+        if (us) parts.push(us + 'µs');
+        if (ns) parts.push(ns + 'ns');
+
+        return parts.join(' ');
+    }
+
     const timeline = new TimelineGL("timeline-container", { 
         initialView: CONFIG.initialView,
         eventHeight: 20,
         trackHeight: 30,
         groupLabelHeight: 50,
         maxLoadedBuckets: CONFIG.maxLoadedBuckets,
+        maxBucketSize: __TIMELINE_DATA__.MAX_BUCKET_SIZE,
         getEventTooltip: (e) => ` <b>${e[NAME]}</b> <br> 
-                                  <b>Group: </b>     ${e[GROUP]} <br> 
-                                  <b>Track: </b>     ${e[TRACK]} <br> 
-                                  <b>Subtrack: </b>  ${e[SUBTRACK]} <br> 
-                                  <b>Start: </b>     ${e[START]} <br> 
-                                  <b>End: </b>       ${e[STOP]} <br> 
-                                  <b>Duration: </b>  ${e[STOP] - e[START]}`,
+                                  <b>Start: </b>     ${formatTime(e[START])} <br> 
+                                  <b>End: </b>       ${formatTime(e[STOP])} <br> 
+                                  <b>Duration: </b>  ${formatTime(e[STOP] - e[START])}`,
         getHistogramTooltip: (segments) => {
-            return segments.map(
-              s => `<b>${s.name}</b>: ${(s.percent * 100).toFixed(2)}%`).join('<br>')
+          return Object.entries(segments)
+            .sort(([, a], [, b]) => b.ratio - a.ratio) // sort descending
+            .map(([name, { ratio }]) => `<b>${name}</b>: ${(ratio * 100).toFixed(2)}%`)
+            .join('<br>');
         },
-        onEventClick: (event) => {
+        onEventClick: (event, metadata) => {
             console.log('Selected event:', event[NAME]);
+            console.log('Event metadata:', metadata);
+        },
+        onTimelineInit: (timeline) => {
+            console.log("Timeline initialized");
+        }, 
+        axisOptions: {
+            axisTimeFormat: formatTime
         }
       });
       
-    console.log("TimelineGL initialized");
 
     const timelineContainer = document.getElementById("timeline-container");
     enableSplitView("dividerPanel", "divider", "horizontal", (newSize) => {
@@ -193,8 +217,7 @@
     });
 
     const fileManager = new FileManager({
-        path: PATH,
-        folderName: FOLDER_NAME,
+        path: "data/traces",
         folderButton: "folderButton",
         handleFile: (file) => { 
           timeline.loadFile(file) 
@@ -203,10 +226,16 @@
 
     const selectInput = new SelectInput("fileSelector", CONFIG.rank, (option, index) => {
       CONFIG.rank = index;
-      const filename = option.toLowerCase().replace(/ /g, '_') + REPORT_EXT;
-      fileManager.openFile(filename);
+      fileManager.openFile(option.value);
     });
-    FILENAMES.forEach(e => selectInput.addOption(e));
+
+    __TIMELINE_DATA__.FILENAMES.forEach(e => {
+      const option = {
+        name: e.replace(".rprof-vis", "").replace(/_/g, ' ').toUpperCase(),
+        value: e
+      }
+      selectInput.addOption(option)
+    });
 
     fileManager.onFolderSelect(() => {
         timelineContainer.style.display = "flex"; 

@@ -3,31 +3,37 @@ class HistogramLayer extends deck.CompositeLayer {
     updateState({props,  changeFlags}) {
         if (changeFlags.dataChanged) {
             const subLayerData = [];
+            const overlayData = [];
 
-            props.data.forEach((d, index) => {
-                const segments = props.getSegments(d);
-                const x = index;
+            for (let barIndex in props.data) {
+                const segments = props.data[barIndex];
+                const x = Number(barIndex);
 
-                segments.forEach(segment => {
-                    // decorate each segment with original object and index
-                    subLayerData.push(this.getSubLayerRow({
-                        x,
-                        percent: segment.percent,
-                        yStart: segment.yStart,
-                        color: segment.color
-                    }, d, index));
-                });
-            });
-            this.setState({subLayerData});
+                let yStart = 0;
+
+                for (let segmentName in segments) {
+                    const {ratio, color} = segments[segmentName];
+
+                    subLayerData.push({
+                        x, ratio, yStart, color
+                    });
+
+                    yStart += ratio;
+                }
+
+                overlayData.push({x, segments});
+            }
+
+         
+            this.setState({subLayerData, overlayData});
         }
     }
 
     renderLayers() {
         const {barWidth, height} = this.props;
-        const {subLayerData} = this.state;
+        const {subLayerData, overlayData} = this.state;
 
         const barCenter = barWidth / 2;
-
         return [
             new deck.SolidPolygonLayer(this.getSubLayerProps({
                 id: `stacked`,
@@ -35,8 +41,8 @@ class HistogramLayer extends deck.CompositeLayer {
                 pickable: false,
                 autoHighlight: false,
                 getPolygon: d => {
-                    const {x, percent, yStart} = d;
-                    const h = height * percent;
+                    const {x, ratio, yStart} = d;
+                    const h = height * ratio;
                     const y0 = height * yStart;
                     return [
                         [x - barCenter, -y0],
@@ -50,12 +56,12 @@ class HistogramLayer extends deck.CompositeLayer {
 
             new deck.SolidPolygonLayer(this.getSubLayerProps({
                 id: `overlay`,
-                data: this.props.data,
-                getPolygon: (d, {index}) => [
-                    [index - barCenter, 0],
-                    [index + barCenter, 0],
-                    [index + barCenter, -height],
-                    [index - barCenter, -height]
+                data: overlayData,
+                getPolygon: d => [
+                    [d.x - barCenter, 0],
+                    [d.x + barCenter, 0],
+                    [d.x + barCenter, -height],
+                    [d.x - barCenter, -height]
                 ],
                 getFillColor: [0, 0, 0, 0],
                 pickable: true,
