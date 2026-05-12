@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="csv/style/csv-table.css">
 <link rel="stylesheet" href="csv/style/csv-misc.css">
 
+<script src="global/js/localStorage.js"></script>
 <script src="global/js/splitView.js"></script>
 <script src="global/js/Table.js"></script>
 <script src="global/js/chart.js"></script>
@@ -19,6 +20,9 @@
 
 <script src="csv/js/textRendering.js"></script>
 <script src="csv/js/csv.js"></script>
+
+<script src="data/misc.js"></script>
+
 <script>
     function isEmpty(obj) {
         if (!obj) return true; 
@@ -30,22 +34,8 @@
     const type = urlParams.get('type');
 
     const configName = `${type}Config`; 
-    let CONFIG = {};
-    function saveConfig() {
-        localStorage.setItem(configName, JSON.stringify(CONFIG));
-    }
 
-    function loadConfig() {
-        return JSON.parse(localStorage.getItem(configName)) || {};
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-        CONFIG = loadConfig();
-    });
-
-    window.addEventListener('beforeunload', () => {
-        saveConfig();
-    });
+    const CONFIG = loadConfig(configName, {})
 
     const script = document.createElement('script');
     script.src = `data/${type}.js`;
@@ -66,7 +56,7 @@
     <h1>RATELProf Visualization</h1>
     <div>
         <a href="index.html">Summary</a>
-        <!-- <a href="timeline.html">Timeline</a> -->
+        <a href="timeline.html">Timeline</a>
         <a href="breakdown.html">Breakdown</a>
         <a href="csv.html?type=statistics">Statistics</a>
         <a href="csv.html?type=analyze">Analyze</a>

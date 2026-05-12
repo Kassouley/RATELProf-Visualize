@@ -72,6 +72,7 @@
   flex: 1;
   padding-left: 10px;
   text-align: left;
+  font-family: monospace;
   order: 99;
 }
 
@@ -79,7 +80,6 @@
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid var(--border-color);
-
 }
 
 /* Track labels base styling */
@@ -97,6 +97,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   position: relative;
+  font-family: monospace;
 }
 
 /* Default prefix for all but last */
@@ -150,15 +151,18 @@
 
 #timeline-tooltip {
   display: none;
-  background-color: #1e1e2f; /* Dark, elegant background */
-  color: #ffffff;             /* White text for contrast */
-  padding: 8px 14px;          /* Comfortable padding */
-  border-radius: 8px;         /* Rounded corners */
-  font-size: 14px;             /* Readable font size */
+  background-color: #1e1e2f; 
+  color: #ffffff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
   font-family: var(--font-family);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); /* Soft shadow */
-  line-height: 1.4;           /* Better text readability */
-  max-width: 250px;           /* Prevent overly wide tooltips */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  line-height: 1.4; 
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 250px; 
 }
 
 

@@ -1,224 +1,364 @@
-const START = 0;
-const STOP = 1;
-const GROUP = 2;
-const TRACK = 3;
-const SUBTRACK = 4;
-const METAOFF = 5;
-const METASIZE = 6;
-const NAME = 7;
-
-const POLYGON_STRIDE = 8;
-const COLOR_STRIDE   = 12;
-
-self.onmessage = function(e) {
-    if (e.data.action === "init") {
-        new RProfVis(self, e.data.file, e.data.options);
-    }
-};
-
 class RProfVis {
-    constructor(worker, file, {
-        trackHeight = 20,
-        eventHeight = 16,
-        maxLoadedBuckets = 100,
-        viewPadding = 10000,
-        maxTime = null
-    } = {}) {
-        this.worker = worker;
-        this.file = file;
-        this.oldView = null;
-        this.loaded = new Map(); // key: bucket id, value: bucket
-        this.loadedIndex = new Set();
-        this.currentLeftmostBucketIndex = null;  // index of leftmost loaded bucket
-        this.currentRightmostBucketIndex = null; // index of rightmost loaded bucket
-
-        this.viewPadding      = viewPadding;
+    constructor(root, {
+        trackHeight,
+        eventHeight,
+        viewPadding,
+        onInit,
+        onRequestSucceed,
+        onEventClick,
+        getEventTooltip,
+        maxTime,
+        maxBucketSize,
+        maxLoadedBuckets = 10,
+        eventLabelThreshold = 500,
+        yOffset = 0,
+    }) {
+        showLoadingPopup();
+        
+        this.root = root;
+        this.viewPadding = viewPadding;
+        this.eventHeight = eventHeight;
+        this.trackHeight = trackHeight;
         this.maxLoadedBuckets = maxLoadedBuckets;
-        this.trackHeight      = trackHeight;
-        this.eventHeight      = eventHeight;
-        this.eventPadding     = (trackHeight - eventHeight) / 2;
+        this.onInit = onInit;
+        this.maxTime = maxTime;
+        this.onRequestSucceed = onRequestSucceed;
+        this.eventLabelThreshold = eventLabelThreshold;
 
-        this.init(maxTime);
+        this.coordinateOrigin = [yOffset, 0, 0];
+        
+        this.loadedBucket = new Map();
+        this.loadedIndex  = new Set();
+
+        this.startIndices = Uint32Array.from({ length: maxBucketSize + 1 }, (_, i) => i * 4);
+        
+        this.getEventTooltip = getEventTooltip;
+
+        this.handleClick = (bucket) => (info, click) => {
+            const event = this.getEvent(bucket, info.index, true);
+            let correlated_events;
+            if (click.srcEvent.ctrlKey) {
+                correlated_events = this.searchVisibleEventByCID(event.cid)
+            } else {
+                correlated_events = this.searchVisibleEventByID(event.id)
+            }
+
+            onEventClick(event, correlated_events, info.index, bucket, click, this.groups[event.group_id]);
+        }
+        this.init();
     }
 
-    async init(maxTime) {
-        await this.readHeader();
-        await this.readStringSection();
-        await this.readLocationSection();
-        await this.readAPIdataSection();
-        await this.readKernelDataSection();
+    getEvent(bucket, index, withMetadata = false) {
+        const buffers = bucket.buffers;
+        const metadatas = bucket.metadata;
+        const metadata_str = metadatas[index];
 
-        this.readBucketMetadataSection();
-        const groups = await this.readGroupSection();
-        this.offsets = groups.map(g => g.tracks.map(t => t.off));
+        const start = buffers.sb[index];
+        const dur = buffers.db[index];
+        const stop = start + dur;
+        const group_id = buffers.gb[index];
+        const track_id = buffers.tb[index];
+        const domain_mode = this.groups[group_id].domain_mode;
 
-        this.initWorkerMessage();
+        const stride = 8;
+        const offset = index * stride
+        const polygon = buffers.pb.subarray(offset, offset + stride);
 
-        this.worker.postMessage({
-            onInit: true,
-            groups,
-            maxTime: maxTime ?? this.maxTime ?? this.buckets[this.buckets.length - 1].maxStop
+        const y = polygon[1];
+
+        const event = {
+            name: this.getString(buffers.fb[index]),
+            id: buffers.ib[index],
+            cid: buffers.jb[index],
+            start, dur, stop, group_id, track_id, domain_mode, metadata_str, polygon, y
+        }
+
+        if (withMetadata) {
+            event.metadata = this.decodeEventMetadata(metadata_str, domain_mode)
+        }
+
+        return event
+    }
+
+    searchVisibleEventByID(id) {
+        for (const bucket of this.loadedBucket.values()) {
+            const jb = bucket.buffers.jb;
+            for (let i = 0; i < bucket.count; i++) {
+                if (jb[i] == id) {
+                    return [this.getEvent(bucket, i)];
+                };
+            }
+        }
+    }
+
+
+    searchVisibleEventByCID(cid) {
+        const events = [];
+        for (const bucket of this.loadedBucket.values()) {
+            const ib = bucket.buffers.ib;
+            for (let i = 0; i < bucket.count; i++) {
+                if (ib[i] == cid) {
+                    events.push(this.getEvent(bucket, i))
+                };
+            }
+        }
+        return events
+    }
+
+    decodeEventMetadata(metadata_str, domain_mode) {
+        const msgpackDecoder = new MSGPackDecoder(atob(metadata_str));
+        const metadata = {};
+        if (domain_mode == 1) {
+            const kernel_id = msgpackDecoder.decode();
+            metadata.kernel_data = this.kernelTable[kernel_id];
+        } else if (domain_mode == 2) {
+            const api_id = msgpackDecoder.decode();
+            const loc_id = msgpackDecoder.decode();
+            metadata.api_data = this.apiTable[api_id];
+            metadata.location = this.locationTable[loc_id];
+        }
+     
+        const nargs = msgpackDecoder.decode();
+        const args  = msgpackDecoder.readArray(nargs);
+        metadata.args = args;
+
+        return metadata;
+    }
+
+    setMaxLoadedBuckets(value) {
+        this.maxLoadedBuckets = value;
+    }
+    
+    setEventLabelThreshold(value) {
+        this.eventLabelThreshold = value;
+    }
+
+    onBucketLoad(bucket, buffers) {
+        bucket.buffers = buffers
+        bucket.polygonAttribute = {
+            length: bucket.count,
+            startIndices: this.startIndices,
+            properties: bucket,
+            attributes: {
+                getPolygon: {value: buffers.pb, size: 2},
+                getFillColor: {value: buffers.cb, size: 3, normalized: true}
+            }
+        };
+        this.onRequestSucceed();
+    }
+
+
+    freeBucket(bucket) {       
+        bucket.buffers = null; 
+        bucket.polygonAttribute = null; 
+        delete bucket.buffers;
+        delete bucket.polygonAttribute;
+    }
+
+
+    updateTooltip({layer, index}, event) {
+        if (!this.getEventTooltip) return;
+        const tooltip = document.getElementById('timeline-tooltip');
+        if (index < 0) {
+            tooltip.style.display = 'none';
+            return;
+        }
+        const e = this.getEvent(layer.props.data.properties, index);
+        if (e) {
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const off = 10;
+            let x = event.center.x + off;
+            let y = event.center.y + off;
+            if (x + tooltipRect.width > window.innerWidth) {
+                x = window.innerWidth - tooltipRect.width - off;
+            } // Prevent right overflow
+            tooltip.style.display = 'block';
+            tooltip.style.left = `${x}px`;
+            tooltip.style.top = `${y}px`;
+            tooltip.innerHTML = this.getEventTooltip(e);
+        } else {
+            tooltip.style.display = 'none';
+        }
+    }
+
+
+    renderBuckets(viewStart, viewStop) {
+        const layers = [];
+
+        for (const bucket of this.loadedBucket.values()) {
+            bucket.visible = bucket.maxStop >= viewStart && bucket.minStart <= viewStop;
+            layers.push(new deck.SolidPolygonLayer({
+                id: `bucket-${bucket.id}`,
+                data: bucket.polygonAttribute,
+                visible: bucket.visible,
+                _normalize: false,
+                pickable: true,
+                autoHighlight: true,
+                onClick: this.handleClick(bucket),
+                coordinateOrigin: this.coordinateOrigin,
+                onHover: (i, e) => this.updateTooltip(i, e)
+            }));
+        }
+
+        const data = this.getEventInRange(viewStart, viewStop, this.eventLabelThreshold);
+        if (data.length == this.eventLabelThreshold) return layers
+
+        layers.push(new deck.TextLayer({
+            id: `label-layer`,
+            data,
+            getContentBox: d => [ 0, 0, d.dur, this.eventHeight ],
+            getPosition: d => [ d.start, d.y ],
+            getText: d => d.name,
+            getSize: this.eventHeight - 6,
+            sizeUnits: "pixels",
+            getColor: [0, 0, 0],
+            getTextAnchor: 'start',
+            getAlignmentBaseline: 'center',
+            contentAlignHorizontal: 'start',
+            contentAlignVertical: 'center',
+            getPixelOffset: [8, 0],
+            fontFamily: "monospace",
+            fontSettings: {
+                sdf: true,
+                radius: 32
+            }
+        }))
+
+        return layers;
+    }
+
+    getEventInRange(viewStart, viewStop, limitNumber) {
+        const events = [];
+
+        for (const bucket of this.loadedBucket.values()) {
+            if (bucket.maxStop < viewStart || bucket.minStart > viewStop) continue;
+            const buffers = bucket.buffers;
+            for (let i = 0; i < bucket.count; i++) {
+                const start = buffers.sb[i];
+                const stop = start + buffers.db[i];
+                if (stop < viewStart || start > viewStop) continue;
+                events.push(this.getEvent(bucket, i));
+                if (limitNumber != null && events.length >= limitNumber) {
+                    return events;
+                }
+            }
+        }
+
+        return events;
+    }
+
+    updateBucketIndexAfterInsert(index) {
+        // update the extremes
+        if (this.currentLeftmostBucketIndex == null || index < this.currentLeftmostBucketIndex ) {
+                this.currentLeftmostBucketIndex = index;
+        }
+        if (this.currentRightmostBucketIndex == null || index > this.currentRightmostBucketIndex ) {
+                this.currentRightmostBucketIndex = index;
+        }
+    }
+
+    updateBucketIndexAfterRemoval() {
+        if (this.loadedIndex.size === 0) return;
+        this.currentLeftmostBucketIndex  = Math.min(...this.loadedIndex);
+        this.currentRightmostBucketIndex = Math.max(...this.loadedIndex);
+    }
+
+    enforceMemory(direction, viewRange) {
+        // Try to evict from the opposite side if over limit, but only if not in current view
+        while (this.loadedBucket.size >= this.maxLoadedBuckets) {
+            let indexToRemove;
+            if (direction == 1) {
+                indexToRemove = this.currentLeftmostBucketIndex;
+            } else {
+                indexToRemove = this.currentRightmostBucketIndex;
+            }
+            const bucketToRemove = this.sortedBucketList[indexToRemove];
+            // Check if bucket is outside the current view
+            if (viewRange && bucketToRemove.maxStop > viewRange[0] && bucketToRemove.minStart < viewRange[1]) {
+                // Bucket is in the current view, cannot evict
+                return false;
+            }
+            console.log("Unload bucket " + bucketToRemove.id)
+            this.loadedBucket.delete(bucketToRemove.id);
+            this.loadedIndex.delete(indexToRemove);
+            this.freeBucket(bucketToRemove);
+            this.updateBucketIndexAfterRemoval();
+        }
+        return true;
+    }
+
+    async loadBucket(bucket, index, direction, viewRange) {
+        // Try to enforce memory before actually loading
+        if (this.loadedBucket.size >= this.maxLoadedBuckets) {
+            const canEvict = this.enforceMemory(direction, viewRange);
+            if (!canEvict) {
+                // Cannot evict, so do not load
+                return;
+            }
+        }
+
+        console.log("Load bucket " + bucket.id)
+        this.loadedBucket.set(bucket.id, bucket);
+        this.loadedIndex.add(index);
+        this.updateBucketIndexAfterInsert(index);
+
+        await this.__loadFile(`${this.root}/bucket_${bucket.id}.js`)
+        bucket.metadata = window.metadata;
+        window.metadata = null;
+        window.worker.postMessage({
+            eh: this.eventHeight,
+            th: this.trackHeight,
+            off: this.offsets
+        });
+        window.worker.onmessage = (e) => {
+            this.onBucketLoad(bucket, e.data)
+        }
+    }
+
+    async requestRender(start, end) {
+        const paddedStart = start - this.viewPadding;
+        const paddedEnd = end + this.viewPadding;
+        const viewRange = [paddedStart, paddedEnd];
+
+        for (let i = 0; i < this.sortedBucketList.length; i++) {
+            const b = this.sortedBucketList[i];
+
+            if (b.maxStop < paddedStart) continue;
+            if (b.minStart > paddedEnd) break;
+
+            if (!this.loadedBucket.has(b.id)) {
+                const direction = this.oldView && start >= this.oldView[0] ? 1 : -1;
+                this.loadBucket(b, i, direction, viewRange);
+            }
+        }
+
+        this.oldView = [start, end];
+    }
+
+    __loadFile(src){
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load ${src}`));
+            document.head.appendChild(script);
         });
     }
 
-
-    initWorkerMessage() {
-        this.worker.onmessage = function(e) {
-            const { action } = e.data;
-            if (action === "requestRender") {
-                const { start, end } = e.data;
-                this.requestRange(start, end);
-            } else if (action === "setMaxLoadedBuckets") {
-                this.maxLoadedBuckets = e.data.maxLoadedBuckets ?? this.maxLoadedBuckets;
-            } else if (action === "requestMetadata") {
-               const { event } = e.data;
-                this.readEventMetadata(event).then(metadata => {
-                    this.worker.postMessage({
-                        onMetadataReady: true,
-                        metadata
-                    });
-                });
-            }
-        }.bind(this);
+    async loadBucketList() {
+        await this.__loadFile(`${this.root}/buckets.js`);
+        this.bucketDict = window.buckets.bucketList;
+        this.sortedBucketList = Object.entries(this.bucketDict)
+                .map(([id, value]) => ({ id, ...value })) 
+                .sort((a, b) => a.minStart - b.minStart);
+        this.maxTime = window.buckets.maxTime;
+        window.buckets = null;
     }
 
-    // ============================
-    // DATA READER
-    // ============================
+    async loadGroup() {
+        await this.__loadFile(`${this.root}/groups.js`);
 
-    async readChunk(offset, size) {
-        const chunk = this.file.slice(offset, offset + size);
-        return await chunk.arrayBuffer();
-    }
-
-    async readHeader() {
-        const headerSize = 6 * 2 * 8; // 6 groups, each with 2 uint64 (offset and size)
-        const buffer = await this.readChunk(0, headerSize);
-
-        if (buffer.byteLength < headerSize) {
-            throw new Error(`ArrayBuffer too small: header expected at least ${headerSize} bytes`);
-        }
-
-        const view = new DataView(buffer);
-        this.header = {};
-
-        const sectionName = ["Group", "BucketMetadata", "APIdata", "KernelData", "Location", "StringTable"];
-
-        for (let i = 0; i < 6; i++) {
-            const base = i * 16;
-
-            const offset = Number(view.getBigUint64(base, true));
-            const size = Number(view.getBigUint64(base + 8, true));
-            this.header[sectionName[i]] = { offset, size };
-        }
-    }
-
-    async readStringSection() {
-        const size = this.header.StringTable.size;
-        const buf = await this.readChunk(this.header.StringTable.offset, size);
-        const msgpackDecoder = new MSGPackDecoder(buf);
-
-        this.stringTable = [];
-        const nstring_off = size - 8; // last 8 bytes contain the number of strings
-        msgpackDecoder.advance(nstring_off);
-        const nstrings = msgpackDecoder.readU64();
-        msgpackDecoder.advance(0);
-
-        for (let i = 0; i < nstrings; i++) {
-            this.stringTable.push(msgpackDecoder.decode());
-        }
-        // debug
-        console.log("String table loaded:", this.stringTable);
-    }
-
-    getString(id) {
-        if (!this.stringTable) {
-            this.readStringSection();
-        }
-        return this.stringTable[id];
-    }
-
-    async readLocationSection() {
-        const size = this.header.Location.size;
-        const buf = await this.readChunk(this.header.Location.offset, size);
-        const msgpackDecoder = new MSGPackDecoder(buf);
-        this.locationTable = [];
-
-        const nlocs_off = size - 8; // last 8 bytes contain the number of locations
-        msgpackDecoder.advance(nlocs_off);
-        const nlocs = msgpackDecoder.readU64();
-        msgpackDecoder.advance(0);
-
-        for (let i = 0; i < nlocs; i++) {
-            this.locationTable.push({
-                return_addr: msgpackDecoder.decode(),
-                base_addr: msgpackDecoder.decode(),
-                objectfile: this.getString(msgpackDecoder.decode()),
-                function:   this.getString(msgpackDecoder.decode()),
-                filename:   this.getString(msgpackDecoder.decode()),
-                line: msgpackDecoder.decode(),
-            });
-        }
-
-        // debug
-        console.log("Location table loaded:", this.locationTable);
-    }
-
-    async readAPIdataSection() {
-        const size = this.header.APIdata.size;
-        const buf = await this.readChunk(this.header.APIdata.offset, size);
-        const msgpackDecoder = new MSGPackDecoder(buf);
-        this.apiTable = [];
-
-        const napis_off = size - 8; // last 8 bytes contain the number of APIs
-        msgpackDecoder.advance(napis_off);
-        const napis = msgpackDecoder.readU64();
-        msgpackDecoder.advance(0);
-
-        for (let i = 0; i < napis; i++) {
-            const name = msgpackDecoder.decode();
-            const nargs = msgpackDecoder.decode();
-            const args = [];
-            for (let j = 0; j < nargs; j++) {
-                args.push({
-                    type: this.getString(msgpackDecoder.decode()),
-                    name: this.getString(msgpackDecoder.decode())
-                });
-            }
-            this.apiTable.push({ name, nargs, args });
-        }
-
-        // debug
-        console.log("API table loaded:", this.apiTable);
-    }
-
-    async readKernelDataSection() {
-        const size = this.header.KernelData.size;
-        const buf = await this.readChunk(this.header.KernelData.offset, size);
-        const msgpackDecoder = new MSGPackDecoder(buf);
-        this.kernelTable = [];
-
-        const nkernels_off = size - 8; // last 8 bytes contain the number of kernels
-        msgpackDecoder.advance(nkernels_off);
-        const nkernels = msgpackDecoder.readU64();
-        msgpackDecoder.advance(0);
-
-        for (let i = 0; i < nkernels; i++) {
-            this.kernelTable.push({
-                name: msgpackDecoder.decode(),
-                object: msgpackDecoder.decode(),
-                group_segment_size: msgpackDecoder.decode(),
-                private_segment_size: msgpackDecoder.decode(),
-            });
-        }
-        // debug
-        console.log("Kernel table loaded:", this.kernelTable);
-    }
-
-    async readGroupSection() {
-        const size = this.header.Group.size;
-        const buf = await this.readChunk(this.header.Group.offset, size);
-        const msgpackDecoder = new MSGPackDecoder(buf);
+        const msgpackDecoder = new MSGPackDecoder(atob(window.groups));
         const ngroups = msgpackDecoder.decode();
         const groups = new Array(ngroups);
 
@@ -231,6 +371,7 @@ class RProfVis {
             const id          = msgpackDecoder.decode();
             const group_label = msgpackDecoder.decode();
             const domain      = msgpackDecoder.decode();
+            const domain_mode = msgpackDecoder.decode();
             const track_label = msgpackDecoder.decode();
             const unit        = msgpackDecoder.decode();
             const ntracks     = msgpackDecoder.decode();
@@ -243,6 +384,8 @@ class RProfVis {
                 const height    = subtracks * this.trackHeight;
                 tracks[track_id] = { 
                     name: `${track_label} ${subunit}`,
+                    label: track_label,
+                    value: subunit,
                     subtracks,
                     off: yOffset,
                     height
@@ -267,288 +410,118 @@ class RProfVis {
 
             groups[id] = { 
                 name: [`${group_label} ${unit}`, domain],
+                label: group_label,
+                value: unit,
+                domain: domain,
                 tracks, 
                 off: groupOffset,
                 height: groupHeight,
+                domain_mode,
                 histogram 
             };
         }
 
-        console.log("Groups loaded:", groups);
-        return groups;
+        this.groups = groups;
+        this.offsets = groups.map(g => g.tracks.map(t => t.off));
+        window.groups = null;
     }
 
-    async readEventMetadata(event) {
-        const buf = await this.readChunk(event[METAOFF], event[METASIZE]);
-        const msgpackDecoder = new MSGPackDecoder(buf);
-        const metadata = {};
-        const what = msgpackDecoder.decode();
-        if (what == false) {
-            const kernel_id = msgpackDecoder.decode();
-            metadata.kernel_data = this.kernelTable[kernel_id];
-            metadata.id = msgpackDecoder.decode();
-        } else if (what == true) {
-            const api_id = msgpackDecoder.decode();
-            const loc_id = msgpackDecoder.decode();
-            metadata.api_data = this.apiTable[api_id];
-            metadata.location = this.locationTable[loc_id];
-            metadata.id = msgpackDecoder.decode();
-        } else {
-            metadata.id = what;
-        }
-        if (msgpackDecoder.peak() === 0xc4) {
-            msgpackDecoder.readU8(); // Skip peak
-            metadata.cid = msgpackDecoder.decode();
-        } else {
-            metadata.cid = 0;
-        }
-
-        const nargs = msgpackDecoder.decode();
-        const args  = msgpackDecoder.readArray(nargs);
-        metadata.args = args;
-
-        return metadata;
+    async loadString() {
+        await this.__loadFile(`${this.root}/strings.js`);
+        this.strings = window.strings;
+        this.getString = (id) => this.strings[id];
+        window.strings = null;
     }
 
-    async readBucketMetadataSection() {
-        const size = this.header.BucketMetadata.size;
-        const buf = await this.readChunk(this.header.BucketMetadata.offset, size);
-        const msgpackDecoder = new MSGPackDecoder(buf);
-        const buckets = [];
-        this.maxTime   = msgpackDecoder.decode();
-        const nbuckets = msgpackDecoder.decode();
-        for (let b = 0; b < nbuckets; b++) {
-            const id        = msgpackDecoder.decode();
-            const off       = msgpackDecoder.decode();
-            const size      = msgpackDecoder.decode();
-            const minStart  = msgpackDecoder.decode();
-            const maxStop   = msgpackDecoder.decode();
-            const count     = msgpackDecoder.decode();
-            buckets.push({ id, off, size, minStart, maxStop, count });
-        }
-        this.buckets = buckets; // sorted by minStart
-        console.log("Buckets loaded:", this.buckets);
-    }
-
-    async readEvents(bucket) {
-        const eventCount    = bucket.count;
-        const colorBuffer   = new Uint8Array(eventCount * COLOR_STRIDE);
-        const polygonBuffer = new Float64Array(eventCount * POLYGON_STRIDE);
-        const eventBuffer   = new Array(eventCount);
-
-        // const nameBuffer         = new Uint8Array(eventCount * 128); // assuming max name length of 128 chars
-        // const namePositionBuffer = new Float64Array(eventCount * 128 * 2);
-        // const nameStartIndices   = new Uint32Array(eventCount + 1); // start index of each name in nameBuffer
+    async loadLocations() {
+        await this.__loadFile(`${this.root}/locations.js`);
         
-        // nameStartIndices[0] = 0;
+        const msgpackDecoder = new MSGPackDecoder(atob(window.locations));
+        this.locationTable = [];
 
-        const buf = await this.readChunk(bucket.off, bucket.size);
-        const msgpackDecoder = new MSGPackDecoder(buf);
-        let i = 0;
+        msgpackDecoder.advance(-8);
+        const nlocs = msgpackDecoder.readU64();
+        msgpackDecoder.advance(0);
 
-        while (msgpackDecoder.off < buf.byteLength) {
-            const group_id = msgpackDecoder.decode();
-            const track_id = msgpackDecoder.decode();
-            while (msgpackDecoder.peak() !== 0xc1) {
-                let subtrack = 0
-                if (msgpackDecoder.peak() === 0xc4) {
-                    msgpackDecoder.readU8(); // Skip peak
-                    subtrack = msgpackDecoder.decode();
-                }
-                const ufunid = msgpackDecoder.decode();
-                const start  = msgpackDecoder.decode();
-                const dur    = msgpackDecoder.decode();
-                const stop   = start + dur;
-                const metadata_off = msgpackDecoder.decode();
-                const metadata_size = msgpackDecoder.decode();
-                const event = [
-                    start, stop, group_id, track_id, subtrack, metadata_off, metadata_size, this.getString(ufunid)
-                ]
-                this.writePolygon(polygonBuffer, i, event);
-                this.writeColor(colorBuffer, i, ufunid);
-                eventBuffer[i++] = event;
+        for (let i = 0; i < nlocs; i++) {
+            this.locationTable.push({
+                return_addr: msgpackDecoder.decode(),
+                base_addr: msgpackDecoder.decode(),
+                objectfile: this.getString(msgpackDecoder.decode()),
+                function:   this.getString(msgpackDecoder.decode()),
+                filename:   this.getString(msgpackDecoder.decode()),
+                line: msgpackDecoder.decode(),
+            });
+        }
+
+        this.locations = locations;
+        window.locations = null;
+    }
+
+    async loadAPIData() {
+        await this.__loadFile(`${this.root}/api_data.js`);
+
+        const msgpackDecoder = new MSGPackDecoder(atob(window.api_data));
+        this.apiTable = [];
+        
+        msgpackDecoder.advance(-8);
+        const napis = msgpackDecoder.readU64();
+        msgpackDecoder.advance(0);
+
+        for (let i = 0; i < napis; i++) {
+            const name = this.getString(msgpackDecoder.decode());
+            const nargs = msgpackDecoder.decode();
+            const args = [];
+            for (let j = 0; j < nargs; j++) {
+                args.push({
+                    type: this.getString(msgpackDecoder.decode()),
+                    name: this.getString(msgpackDecoder.decode())
+                });
             }
-            msgpackDecoder.readU8(); // Skip peak
+            this.apiTable.push({ name, nargs, args });
         }
-        bucket.events = eventBuffer;
-        bucket.colorBuffer = colorBuffer;
-        bucket.polygonBuffer = polygonBuffer;
-        
-        // bucket.nameBuffer = nameBuffer;
-        // bucket.nameStartIndices = nameStartIndices;
-        // bucket.namePositionBuffer = namePositionBuffer;
     }
 
-    // ============================
-    // BUFFER WRITTER
-    // ============================
+    async loadKernelData() {
+        await this.__loadFile(`${this.root}/kernel_data.js`);
 
-    // writeName(buffer, positions, startIndices, index, event) {
-    //     const start = startIndices[index];
-    //     const name = event[NAME];
-    //     const length = Math.min(name.length, 128);
-    //     const { x1, x2, y1, y2 } = this.getEventCoord(event);
-    //     const x = (x1 + x2) / 2;
-    //     const y = (y1 + y2) / 2;
+        const msgpackDecoder = new MSGPackDecoder(atob(window.kernel_data));
+        this.kernelTable = [];
 
-    //     let posOffset = start * 2;
-    //     let bufOffset = start;
+        msgpackDecoder.advance(-8);
+        const nkernels = msgpackDecoder.readU64();
+        msgpackDecoder.advance(0);
 
-    //     for (let i = 0; i < length; i++) {
-    //         positions[posOffset] = x;
-    //         positions[posOffset + 1] = y;
-    //         buffer[bufOffset] = name.charCodeAt(i);
-
-    //         posOffset += 2;
-    //         bufOffset += 1;
-    //     }
-
-    //     startIndices[index + 1] = start + length;
-    // }
-
-
-    writePolygon(buffer, index, event) {
-        let i = index * POLYGON_STRIDE;
-        const { x1, x2, y1, y2 } = this.getEventCoord(event);
-        buffer[i++] = x1;
-        buffer[i++] = y1;
-        buffer[i++] = x2;
-        buffer[i++] = y1;
-        buffer[i++] = x2;
-        buffer[i++] = y2;
-        buffer[i++] = x1;
-        buffer[i++] = y2;
+        for (let i = 0; i < nkernels; i++) {
+            this.kernelTable.push({
+                name: this.getString(msgpackDecoder.decode()),
+                object: msgpackDecoder.decode(),
+                group_segment_size: msgpackDecoder.decode(),
+                private_segment_size: msgpackDecoder.decode(),
+            });
+        }
     }
 
 
-    writeColor(buffer, index, id) {
-        let i = index * COLOR_STRIDE;
-        const [r, g, b] = numberToLightColor(id);
-        buffer[i++] = r;
-        buffer[i++] = g;
-        buffer[i++] = b;
-        buffer[i++] = r;
-        buffer[i++] = g;
-        buffer[i++] = b;
-        buffer[i++] = r;
-        buffer[i++] = g;
-        buffer[i++] = b;
-        buffer[i++] = r;
-        buffer[i++] = g;
-        buffer[i++] = b;
-    }
+    async init() {
+        updateLoadingMessage("Loading bucket list...")
+        await this.loadBucketList();
+        updateLoadingMessage("Loading strings...")
+        await this.loadString();
+        updateLoadingMessage("Loading groups...")
+        await this.loadGroup();
+        updateLoadingMessage("Loading locations data...")
+        await this.loadLocations();
+        updateLoadingMessage("Loading API data...")
+        await this.loadAPIData();
+        updateLoadingMessage("Loading kernel data...")
+        await this.loadKernelData();
 
+        hideLoadingPopup();
 
-    getEventCoord(e) {
-        const off = this.offsets[e[GROUP]][e[TRACK]];
-        const y1 = off + e[SUBTRACK] * this.trackHeight + this.eventPadding;
-        const y2 = y1 + this.eventHeight;
-        return { 
-            x1: e[START], x2: e[STOP], y1, y2
-        };
-    }
-
-    freeBucket(bucket) {
-        this.worker.postMessage({
-            onBucketFree: true,
-            bucketId: bucket.id
+        this.onInit({
+            maxTime: this.maxTime,
+            groups: this.groups
         });
-        delete bucket.colorBuffer;
-        delete bucket.polygonBuffer;
-        bucket.colorBuffer = null;
-        bucket.polygonBuffer = null;
-    }
-
-    updateBucketIndexAfterInsert(index) {
-        // update the extremes
-        if ( this.currentLeftmostBucketIndex === null ||
-            index < this.currentLeftmostBucketIndex ) {
-                this.currentLeftmostBucketIndex = index;
-        }
-        if (this.currentRightmostBucketIndex === null ||
-            index > this.currentRightmostBucketIndex ) {
-                this.currentRightmostBucketIndex = index;
-        }
-    }
-
-    updateBucketIndexAfterRemoval() {
-        if (this.loadedIndex.size === 0) {
-            this.currentLeftmostBucketIndex = null;
-            this.currentRightmostBucketIndex = null;
-            return;
-        }
-
-        this.currentLeftmostBucketIndex  = Math.min(...this.loadedIndex);
-        this.currentRightmostBucketIndex = Math.max(...this.loadedIndex);
-    }
-
-    enforceMemory(direction, viewRange) {
-        // Try to evict from the opposite side if over limit, but only if not in current view
-        while (this.loaded.size >= this.maxLoadedBuckets) {
-            let indexToRemove;
-            if (direction == 1) {
-                indexToRemove = this.currentLeftmostBucketIndex;
-            } else {
-                indexToRemove = this.currentRightmostBucketIndex;
-            }
-            const bucketToRemove = this.buckets[indexToRemove];
-            // Check if bucket is outside the current view
-            if (viewRange && bucketToRemove.maxStop > viewRange[0] && bucketToRemove.minStart < viewRange[1]) {
-                // Bucket is in the current view, cannot evict
-                return false;
-            }
-            this.loaded.delete(bucketToRemove.id);
-            this.loadedIndex.delete(indexToRemove);
-            this.freeBucket(bucketToRemove);
-            this.updateBucketIndexAfterRemoval();
-        }
-        return true;
-    }
-
-    async loadBucket(bucket, index, direction, viewRange) {
-        if (!this.loaded.has(bucket.id)) {
-            // Try to enforce memory before actually loading
-            if (this.loaded.size >= this.maxLoadedBuckets) {
-                const canEvict = this.enforceMemory(direction, viewRange);
-                if (!canEvict) {
-                    // Cannot evict, so do not load
-                    return;
-                }
-            }
-            this.loaded.set(bucket.id, bucket);
-            this.loadedIndex.add(index);
-            this.updateBucketIndexAfterInsert(index);
-            await this.readEvents(bucket);
-
-            this.worker.postMessage({
-                onBucketLoad: true, bucket
-            // }, [bucket.colorBuffer.buffer, bucket.polygonBuffer.buffer, bucket.nameBuffer.buffer, bucket.nameStartIndices.buffer, bucket.namePositionBuffer.buffer]);
-            }, [bucket.colorBuffer.buffer, bucket.polygonBuffer.buffer]);
-            delete bucket.events;
-            bucket.events = null;
-        }
-    }
-
-    async requestRange(start, end) {
-        const paddedStart = start - this.viewPadding;
-        const paddedEnd = end + this.viewPadding;
-        const viewRange = [paddedStart, paddedEnd];
-
-        for (let i = 0; i < this.buckets.length; i++) {
-            const b = this.buckets[i];
-
-            if (b.maxStop < paddedStart) continue;
-            if (b.minStart > paddedEnd) break;
-
-            if (!this.loaded.has(i)) {
-                const direction =
-                    this.oldView && start >= this.oldView[0] ? 1 : -1;
-                await this.loadBucket(b, i, direction, viewRange);
-            }
-        }
-
-        this.oldView = [start, end];
-        this.worker.postMessage({ requestSucceeded: true });
-        return;
     }
 }

@@ -6,48 +6,37 @@
 <link rel="stylesheet" href="global/style/global.css">
 <link rel="stylesheet" href="global/style/components.css">
 <link rel="stylesheet" href="global/style/tabs.css">
+<link rel="stylesheet" href="global/style/table.css">
 
 <link rel="stylesheet" href="timeline/style/timeline-gl.css">
 <link rel="stylesheet" href="timeline/style/tabs.css">
 
-<script src="https://cdn.jsdelivr.net/npm/deck.gl@latest/dist.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/deck.gl@9.3.2/dist.min.js"></script>
 
+<script src="global/js/localStorage.js"></script>
 <script src="global/js/splitView.js"></script>
 
+<script src="timeline/js/MSGPackDecoder.js"></script>
+<script src="timeline/js/RProfVis.js"></script>
 <script src="timeline/js/HistogramLayer.js"></script>
 <script src="timeline/js/ControllerGL.js"></script>
 <script src="timeline/js/UtilsGL.js"></script>
 <script src="timeline/js/GroupGL.js"></script>
-<script src="timeline/js/BucketManager.js"></script>
 <script src="timeline/js/TimelineGL.js"></script>
 
 <script src="timeline/js/TimeInput.js"></script>
 <script src="timeline/js/SelectInput.js"></script>
-<script src="timeline/js/FileManager.js"></script>
 
+<script src="data/misc.js"></script>
 <script src="data/timeline.js"></script>
-
 <script>
-    const configName = "timelineConfig"; 
-    let CONFIG;
-
-    function saveConfig() {
-        localStorage.setItem(configName, JSON.stringify(CONFIG));
-    }
-
-    function loadConfig() {
-        return JSON.parse(localStorage.getItem(configName)) || {};
-    }
-
-    CONFIG = loadConfig() ?? {
-      rank: 0,
+    const CONFIG = loadConfig("timelineConfig", {
+      rankIdx: 0,
       initialView: [0, 1_000_000],
-      maxLoadedBuckets: 50
-    };
-
-    window.addEventListener('beforeunload', () => {
-        CONFIG.initialView = timeline.getView();
-        saveConfig();
+      maxLoadedBuckets: 20,
+      eventLabelThreshold: 500,
+    }, (config) => {
+      config.initialView = timeline.getView();
     });
 </script>
 </head>
@@ -75,7 +64,7 @@
     <div id="bottomPanel">
       <div class="tabs">
         <button onclick="changeTab(this, 'settings')">⚙</button>
-        <button onclick="changeTab(this, 'event')" class="active">Event</button>
+        <button onclick="changeTab(this, 'eventTab')" class="active">Event</button>
 
         <div id="fileSelector"></div>
         <div id="gotoDiv">
@@ -84,7 +73,7 @@
         </div>
       </div>
 
-      <div class="tab-content" id="event">EVENT</div>
+      <div class="tab-content" id="eventTab">Click on an event to see more details.</div>
 
       <div class="tab-content" id="settings">
         <div class="settings-left">
@@ -93,6 +82,9 @@
           </div>
           <div class="setting-item" data-desc="Maximum number of buckets that can be loaded simultaneously. Higher values increase memory usage but may improve loading speed.">
             <label> Max Buckets Loaded <input type="number" id="maxBuckets" min="1" max="1000"> </label>
+          </div>
+          <div class="setting-item" data-desc="If the number of event visible on the screen is greater than this threshold, then no label will be shown in event box.">
+            <label> Event Label Threshold <input type="number" id="eventLabelThreshold" min="1" max="100000"> </label>
           </div>
         </div>
 
@@ -132,7 +124,7 @@
       if(button) button.classList.add('active');
     }
 
-    changeTab(null, "event");
+    changeTab(null, "eventTab");
 
 
     function formatTime(t) {
@@ -159,21 +151,21 @@
         trackHeight: 30,
         groupLabelHeight: 50,
         maxLoadedBuckets: CONFIG.maxLoadedBuckets,
+        eventLabelThreshold: CONFIG.eventLabelThreshold,
         maxBucketSize: __TIMELINE_DATA__.MAX_BUCKET_SIZE,
-        getEventTooltip: (e) => ` <b>${e[NAME]}</b> <br> 
-                                  <b>Start: </b>     ${formatTime(e[START])} <br> 
-                                  <b>End: </b>       ${formatTime(e[STOP])} <br> 
-                                  <b>Duration: </b>  ${formatTime(e[STOP] - e[START])}`,
+        getEventTooltip: (e) => ` <b>${e.name}</b> <br> 
+                                  <b>ID: </b>        ${e.id} <br> 
+                                  <b>CID: </b>       ${e.cid} <br> 
+                                  <b>Start: </b>     ${formatTime(e.start)} <br> 
+                                  <b>End: </b>       ${formatTime(e.stop)} <br> 
+                                  <b>Duration: </b>  ${formatTime(e.dur)}`,
         getHistogramTooltip: (segments) => {
           return Object.entries(segments)
             .sort(([, a], [, b]) => b.ratio - a.ratio) // sort descending
-            .map(([name, { ratio }]) => `<b>${name}</b>: ${(ratio * 100).toFixed(2)}%`)
+            .map(([name, { ratio }]) => `${(ratio * 100).toFixed(2)}% : <b>${name}</b>`)
             .join('<br>');
         },
-        onEventClick: (event, metadata) => {
-            console.log('Selected event:', event[NAME]);
-            console.log('Event metadata:', metadata);
-        },
+        onEventClick: showTraceDetails,
         onTimelineInit: (timeline) => {
             console.log("Timeline initialized");
         }, 
@@ -209,37 +201,32 @@
         timeline.toggleFPS(e.target.checked);
       });
 
-    const input = document.getElementById("maxBuckets");
-    input.value = CONFIG.maxLoadedBuckets;
-    input.addEventListener("input", (e) => {
+    const input1 = document.getElementById("maxBuckets");
+    input1.value = CONFIG.maxLoadedBuckets;
+    input1.addEventListener("input", (e) => {
       CONFIG.maxLoadedBuckets = e.target.value;
       timeline.setMaxLoadedBuckets(e.target.value);
     });
 
-    const fileManager = new FileManager({
-        path: "data/traces",
-        folderButton: "folderButton",
-        handleFile: (file) => { 
-          timeline.loadFile(file) 
-        }
-    })
+    
+    const input2 = document.getElementById("eventLabelThreshold");
+    input2.value = CONFIG.eventLabelThreshold;
+    input2.addEventListener("input", (e) => {
+      CONFIG.eventLabelThreshold = e.target.value;
+      timeline.setEventLabelThreshold(e.target.value);
+    });
 
-    const selectInput = new SelectInput("fileSelector", CONFIG.rank, (option, index) => {
-      CONFIG.rank = index;
-      fileManager.openFile(option.value);
+    const selectInput = new SelectInput("fileSelector", CONFIG.rankIdx, (option, index) => {
+      CONFIG.rankIdx = index;
+      timeline.loadReport(option.value) 
     });
 
     __TIMELINE_DATA__.FILENAMES.forEach(e => {
       const option = {
         name: e.replace(".rprof-vis", "").replace(/_/g, ' ').toUpperCase(),
-        value: e
+        value: `data/traces/${e}`
       }
       selectInput.addOption(option)
-    });
-
-    fileManager.onFolderSelect(() => {
-        timelineContainer.style.display = "flex"; 
-        selectInput.triggerSelect();
     });
 
     const timeInput = new TimeInput("gotoInput");
@@ -250,9 +237,100 @@
     })
 
 
-    if (IS_LOCAL) {
-      timelineContainer.style.display = "none"; 
+
+    function formatAddr(n) {
+      return "0x" + n.toString(16);
     }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+      
+        const units = ['Bytes', 'KB', 'MB', 'GB'];
+        const size = Math.floor(Math.log(bytes) / Math.log(1024));
+        const formattedSize = bytes / Math.pow(1024, size);
+      
+        return `${formattedSize % 1 === 0 ? formattedSize.toFixed(0) : formattedSize.toFixed(2)} ${units[size]}`
+    }
+
+    function formatLocation(loc) {
+      return `${loc.filename}:${loc.line} in ${loc.function} (${loc.objectfile} at ${formatAddr(loc.return_addr)})`
+    }
+
+    function escapeHTML(input) {
+      if (typeof input !== "string") return input;
+      if (!input) return "";
+      return input
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatArgs(args_values, args_labels) {
+      let html = '';
+
+      args_labels.forEach((label, i) => {
+        const value = `<span style="color:#b5651d;">${JSON.stringify(args_values[i])}</span>`
+        const type = `<span style="color:#3d7a57;">${label.type}</span>`
+        const name = `<span style="color:#2a659e;">${label.name}</span>`
+        html += `<div>${type} ${name} = ${value}</div>`
+      });
+
+      return html;
+    }
+
+    function showTraceDetails(trace, group, track) {
+        const traceInfo = document.getElementById("eventTab");
+        traceInfo.innerHTML = "";
+        
+        const domain_mode = group.domain_mode;
+        const metadata = trace.metadata;
+        const args = metadata.args;
+        const lcol = [];
+        const rcol = [];
+        
+        const append = (details, field, value) => details.push(`<tr><td>${escapeHTML(field)}:</td> <td>${escapeHTML(value)}</td></tr>`);
+
+        append(lcol, "Name",       trace.name);
+        append(lcol, "ID",         trace.id);
+        append(lcol, "CID",        trace.cid);
+        append(lcol, "Duration",   formatTime(trace.dur));
+        append(lcol, "Start Time", formatTime(trace.start));
+        append(lcol, "End Time",   formatTime(trace.stop));
+        append(rcol, group.label,              group.value);
+        append(rcol, track.label,              track.value);
+
+        if (domain_mode == 1) {
+            const queue_time = trace.start - args[1]; 
+            append(lcol, "Dispatch Time",          formatTime(args[1]));
+            append(lcol, "Queue Duration",         formatTime(queue_time));
+            append(rcol, "Block Dimension",        `[${args[2].join(", ")}]`);
+            append(rcol, "Grid Dimension",         `[${args[3].join(", ")}]`);
+            append(rcol, "Private Segment Size",   metadata.kernel_data.private_segment_size);
+            append(rcol, "Group Segment Size",     metadata.kernel_data.group_segment_size);
+            append(rcol, "Kernel Handle",          formatAddr(metadata.kernel_data.object));
+            append(rcol, "Kernel Arg Addr",        formatAddr(args[4]));
+            append(rcol, "Completion Signal",      formatAddr(args[0]));
+
+        } else if (domain_mode == 0) {
+            append(rcol, "Size transferred",   formatBytes(args[1]));
+            append(rcol, "Other handle",       formatAddr(args[2]));
+            append(rcol, "Completion Signal",  formatAddr(args[0]));
+
+        } else if (domain_mode == 3) {
+            append(lcol, "Dispatch Time",      formatTime(args[1]));
+            append(rcol, "Dependent Signals",  `[${args[2].map(e => formatAddr(e)).join(", ")}]`);
+            append(rcol, "Completion Signal",  formatAddr(args[0]));
+
+        } else {
+            append(rcol, "Source", formatLocation(metadata.location));
+            rcol.push(`<tr><td>Function Arguments:</td> <td>${formatArgs(args, metadata.api_data.args)}</td></tr>`);
+        }
+        traceInfo.innerHTML = `<div class="two-column"><div class="scrollable"><table>${lcol.join("\n")}</table></div><div class="scrollable"><table>${rcol.join("\n")}</table></div></div>`;
+    }
+
+
 
 </script>
 </html>

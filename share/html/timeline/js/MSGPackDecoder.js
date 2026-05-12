@@ -1,77 +1,67 @@
 class MSGPackDecoder {
-    constructor(buffer) {
+    constructor(binstr) {
         this.off = 0;
-        this.bytes = new Uint8Array(buffer);
-        this.view  = new DataView(buffer);
+        this.bytes = binstr;
+        
+        this._buf8 = new ArrayBuffer(8);
+        this._u8 = new Uint8Array(this._buf8);
+        this._view = new DataView(this._buf8);
+
         this.textDecoder = new TextDecoder();
     }
 
     advance(bytes) {
-        this.off = bytes;
+        if (bytes < 0) {
+            this.off = this.bytes.length + bytes;
+        } else {
+            this.off = bytes;
+        }
     }
 
-    peak() { return this.bytes[this.off]; }
+    peak() { return this.bytes.charCodeAt(this.off); }
     
-    readU8() { return this.bytes[this.off++]; }
+    readU8() { return this.bytes.charCodeAt(this.off++); }
     
-    readI8() { return (this.bytes[this.off++] << 24) >> 24; }
+    readI8() { return (this.readU8() << 24) >> 24; }
 
     readU16() {
-        const b = this.bytes;
-        let o = this.off;
-        const b0 = b[o++];
-        const b1 = b[o++];
-        this.off = o;
+        const b0 = this.readU8();
+        const b1 = this.readU8();
         return b0 | (b1 << 8);
     }
 
     readI16() {
-        const b = this.bytes;
-        let o = this.off;
-        const b0 = b[o++];
-        const b1 = b[o++];
-        this.off = o;
+        const b0 = this.readU8();
+        const b1 = this.readU8();
         const v = b0 | (b1 << 8);
         return (v << 16) >> 16;
     }
 
     readU32() {
-        const b = this.bytes;
-            let o = this.off;
-            const b0 = b[o++];
-            const b1 = b[o++];
-            const b2 = b[o++];
-            const b3 = b[o++];
-        this.off = o;
+        const b0 = this.readU8();
+        const b1 = this.readU8();
+        const b2 = this.readU8();
+        const b3 = this.readU8();
         return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
     }
 
     readI32() {
-        const b = this.bytes;
-        let o = this.off;
-        const b0 = b[o++];
-        const b1 = b[o++];
-        const b2 = b[o++];
-        const b3 = b[o++];
-        this.off = o;
+        const b0 = this.readU8();
+        const b1 = this.readU8();
+        const b2 = this.readU8();
+        const b3 = this.readU8();
         return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) | 0;
     }
 
     readU64() {
-        const b = this.bytes;
-        let o = this.off;
-
-        const b0 = b[o++];
-        const b1 = b[o++];
-        const b2 = b[o++];
-        const b3 = b[o++];
-        const b4 = b[o++];
-        const b5 = b[o++];
-        const b6 = b[o++];
-        const b7 = b[o++];
-
-        this.off = o;
-
+        const b0 = this.readU8();
+        const b1 = this.readU8();
+        const b2 = this.readU8();
+        const b3 = this.readU8();
+        const b4 = this.readU8();
+        const b5 = this.readU8();
+        const b6 = this.readU8();
+        const b7 = this.readU8();
         const low  = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
         const high = b4 | (b5 << 8) | (b6 << 16) | (b7 << 24);
         const value = high * 2 ** 32 + (low >>> 0);
@@ -84,27 +74,53 @@ class MSGPackDecoder {
     }
 
     readI64() {
-        const v = this.readU64();
-        return v > 0x7FFFFFFFFFFFFFFFn ? v - 0x10000000000000000n : v;
+        const b0 = this.readU8();
+        const b1 = this.readU8();
+        const b2 = this.readU8();
+        const b3 = this.readU8();
+        const b4 = this.readU8();
+        const b5 = this.readU8();
+        const b6 = this.readU8();
+        const b7 = this.readU8();
+
+        const low  = (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
+        const high = (b4 | (b5 << 8) | (b6 << 16) | (b7 << 24)) >>> 0;
+
+        let value = high * 2 ** 32 + low;
+
+        // if sign bit is set (negative number in int64)
+        if (high & 0x80000000) {
+            value -= 2 ** 64;
+        }
+
+        return value;
     }
 
     readF32() {
-        const v = this.view.getFloat32(this.off, true);
-        this.off += 4;
-        return v;
+        this._u8[0] = this.readU8();
+        this._u8[1] = this.readU8();
+        this._u8[2] = this.readU8();
+        this._u8[3] = this.readU8();
+        return this._view.getFloat32(0, true);
     }
 
     readF64() {
-        const v = this.view.getFloat64(this.off, true);
-        this.off += 8;
-        return v;
+        this._u8[0] = this.readU8();
+        this._u8[1] = this.readU8();
+        this._u8[2] = this.readU8();
+        this._u8[3] = this.readU8();
+        this._u8[4] = this.readU8();
+        this._u8[5] = this.readU8();
+        this._u8[6] = this.readU8();
+        this._u8[7] = this.readU8();
+        return this._view.getFloat64(0, true);
     }
 
     readString(len) {
         const s = this.off;
         const e = s + len;
         this.off = e;
-        return this.textDecoder.decode(this.bytes.subarray(s, e));
+        return this.bytes.slice(s, e);
     }
     
     readArray(len) {

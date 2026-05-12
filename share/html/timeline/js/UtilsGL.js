@@ -10,31 +10,52 @@ const METASIZE = 6;
 const NAME = 7;
 
 
+function showLoadingPopup() {
+    const overlay = document.createElement("div");
+    overlay.id = "loadingOverlay";
+
+    overlay.innerHTML = `
+        <div class="loading-box">
+        <div class="spinner"></div>
+        <p id="loadingMessage">Loading, please wait...</p>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+function hideLoadingPopup() {
+    const overlay = document.getElementById("loadingOverlay");
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+function updateLoadingMessage(message) {
+    const msgEl = document.getElementById("loadingMessage");
+    if (msgEl) {
+        msgEl.textContent = message;
+    }
+}
+
 const hashColorCache = new Map();
 
-function hashStringToLightColor(str) {
-    if (hashColorCache.has(str)) {
-        return hashColorCache.get(str);
-    }
+function numberToLightColor(n) {
+    const cached = hashColorCache.get(n);
+    if (cached !== undefined) return cached;
 
-    // Simple hash function to generate a color
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
+    let hash = n | 0;
 
-    // Convert hash to RGB array
-    let r = (hash >> 0) & 0xFF;
-    let g = (hash >> 8) & 0xFF;
-    let b = (hash >> 16) & 0xFF;
+    hash = (hash ^ (hash >>> 16)) * 0x45d9f3b;
+    hash = (hash ^ (hash >>> 16)) * 0x45d9f3b;
+    hash = hash ^ (hash >>> 16);
 
-    // Keep values in light range (127-255)
-    r = Math.floor(r / 2 + 127);
-    g = Math.floor(g / 2 + 127);
-    b = Math.floor(b / 2 + 127);
+    const r = ((hash        & 0xFF) >>> 1) + 128;
+    const g = ((hash >>> 8  & 0xFF) >>> 1) + 128;
+    const b = ((hash >>> 16 & 0xFF) >>> 1) + 128;
 
     const color = [r, g, b];
-    hashColorCache.set(str, color);
+    hashColorCache.set(n, color);
     return color;
 }
 

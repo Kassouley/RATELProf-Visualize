@@ -101,3 +101,32 @@
   border: none;
 }
 
+
+.two-column {
+    width: 100%;
+    gap:10px;
+    display:flex;
+}
+
+.two-column th:first-child,
+.two-column td:first-child {
+    font-weight: bold;
+    width: 200px;
+}
+
+.indent {
+    margin-left: 20px;
+}
+
+.key {
+    font-weight: bold;
+    color: #2a659e;
+}
+
+.type {
+    color: #3d7a57;
+}
+
+.value {
+    color: #b5651d;
+}

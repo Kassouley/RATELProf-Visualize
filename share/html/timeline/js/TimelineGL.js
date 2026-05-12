@@ -1,6 +1,5 @@
 // TimelineGL.js
 
-
 class TimelineGL {
     constructor(containerId, {
                 trackHeight = 20,
@@ -18,11 +17,11 @@ class TimelineGL {
                 onEventClick,
                 onTimelineInit,
                 initialView = [minTime, maxTime],
-                maxLoadedBuckets = 100,
+                maxLoadedBuckets = 10,
+                eventLabelThreshold = 500,
                 maxBucketSize = 10000,
                 viewPadding = 10000
             } = {}) {
-
         this.minTime = minTime; 
         this.maxTime = maxTime; 
         this.padding = padding;
@@ -37,6 +36,7 @@ class TimelineGL {
         this.getHistogramTooltip = getHistogramTooltip;
         this.initialView = initialView;
         this.maxLoadedBuckets = maxLoadedBuckets;
+        this.eventLabelThreshold = eventLabelThreshold;
         this.viewPadding = viewPadding;
         this.onEventClick = onEventClick;
         this.onTimelineInit = onTimelineInit;
@@ -44,7 +44,6 @@ class TimelineGL {
         this.viewStop  = this.initialView[1];
 
         this.scrollOffset = 0;
-        this.lastClickedEvent = null;
 
         this.createTooltip();
         
@@ -71,7 +70,7 @@ class TimelineGL {
         return [this.viewStart, this.viewStop];
     }
 
-    loadFile(file) {
+    loadReport(root) {
         this.destroy();
 
         const { 
@@ -82,6 +81,7 @@ class TimelineGL {
             trackHeight, 
             eventHeight,
             maxLoadedBuckets,
+            eventLabelThreshold,
             viewPadding,
             maxTime,
             maxBucketSize
@@ -95,17 +95,18 @@ class TimelineGL {
             eventHeight
         };
 
-        this.bucketManager = new BucketManager(file, {
+        this.rprofvis = new RProfVis(root, {
             trackHeight,
             eventHeight,
             maxLoadedBuckets,
+            eventLabelThreshold,
             viewPadding,
             getEventTooltip,
             maxTime,
             maxBucketSize,
             onInit: ({maxTime, groups}) => {
                 this.maxTime = maxTime;
-                this.maxVisibleRange = this.minUserZoom ?? maxTime;
+                this.maxVisibleRange = maxTime;
                 this.minVisibleRange = this.maxUserZoom;
 
                 this.setInitialViewstate(this.viewStart, this.viewStop);
@@ -118,36 +119,74 @@ class TimelineGL {
 
                 this.initializeGL();
                 if (this.onTimelineInit) this.onTimelineInit(this);
+                this.updateGroupLabel();
             },
 
             onRequestSucceed: () => {
                 this.renderLayers();
             },
 
-            onMetadataReady: (metadata) => {
-                if (this.onEventClick) this.onEventClick(this.lastClickedEvent, metadata);
-            },
+            onEventClick: (event, correlated_events, index, bucket, click, group) => {
+                if (!event) return;
+                if (click.type === "dblclick") {
+                    this.gotoView(event.start, event.stop);
+                }
 
-            onEventClick: (object, index, bucket, event) => {
-                if (!object) return;
-                if (event.type === "dblclick") {
-                    this.gotoView(object[START], object[STOP]);
+                // Dispatch Event, show dispatch time
+                if (group.domain_mode == 1 || group.domain_mode == 3) {
+                    this.getDispatchData(event);
                 }
                 
-                // Store the clicked event for metadata handling
-                this.lastClickedEvent = object;
-                
-                // Request metadata from the worker
-                this.bucketManager.requestMetadata(object);
-                
-                // Highlight the polygon
-                const eventStride = 8;
-                const eventOffset = index * eventStride
-                const polygon = bucket.polygonBuffer.subarray(eventOffset, eventOffset + eventStride);
-                this.highlightPolygons = [{polygon}];
+                // Highlight the polygons
+                this.highlightPolygons = [
+                    { polygon: event.polygon, color: [255, 255, 0] },
+                    ...(correlated_events || []).map(e => ({
+                        polygon: e.polygon, color: [255, 0, 0]
+                    }))
+                ];
                 this.renderLayers();
-            },
+                const track = group.tracks[event.track_id]
+                this.onEventClick(event, group, track)
+            }
         })
+    }
+
+    getDispatchData(event) {
+        const dispatch_time = event.metadata.args[1];
+        const event_start = event.start;
+        const y1 = event.polygon[1];
+        const y2 = event.polygon[5];
+        const event_y = y2 - (y2 - y1)/2;
+        this.dispatchData = [{
+            position: [dispatch_time, event_y],
+            length: event_start - dispatch_time
+        }]
+    }
+
+    renderDispatch() {
+        if (!this.dispatchData) return;
+        return [
+            new deck.ScatterplotLayer({
+                id: '__internal-dispatch-points',
+                data: this.dispatchData,
+                getPosition: d => d.position,
+                getRadius: 5,
+                radiusUnits: 'pixels',
+                getFillColor: [0, 0, 0]
+            }),
+
+            new deck.LineLayer({
+                id: '__internal-dispatch-line',
+                data: this.dispatchData,
+                getSourcePosition: d => d.position,
+                getTargetPosition: d => [
+                    d.position[0] + d.length,
+                    d.position[1]
+                ],
+                getColor: [0, 0, 0],
+                getWidth: 2
+            })
+        ] 
     }
 
     createTooltip() {
@@ -222,6 +261,17 @@ class TimelineGL {
         this.updateViews();
     }
 
+    updateGroupLabel() {
+        let oldGroupName0 = null;
+        this.groups.forEach(group => {
+            if (oldGroupName0 == group.name[0])
+                group.updateGroupName(true);
+            else
+                group.updateGroupName(false);
+            oldGroupName0 = group.name[0]
+        });
+    }
+
     // Swap two groups (by id) and update DOM order and views
     reorderGroups(source, target) {
         const children = Array.from(this.trackLabelContainer.children);
@@ -243,6 +293,7 @@ class TimelineGL {
 
         // update views
         this.updateViews();
+        this.updateGroupLabel();
     }
 
     // Mouse-based drag & drop for reordering groups with visual feedback
@@ -314,7 +365,8 @@ class TimelineGL {
         this.renderLayers();
         if (event.rightButton) {
             this.onDrag(info, event);
-            console.log("TODO: Compute the number of events in the range")
+            const [start, stop] = this.rangeSelection[0];
+            console.log(this.rprofvis.getEventInRange(start, stop), 1000)
         }
     }
 
@@ -344,6 +396,7 @@ class TimelineGL {
                     return;
                 }
                 if (info.index >= 0) return;
+                this.dispatchData = null;
                 this.highlightPolygons = [{polygon: new Array(8).fill(-1)}];
                 this.renderLayers();
             },
@@ -385,12 +438,9 @@ class TimelineGL {
 
     }
 
-    requestMetadata(event) {
-        this.bucketManager.requestMetadata(event);
-    }
 
     requestRender() {
-        this.bucketManager.requestRender(this.viewStart, this.viewStop);
+        this.rprofvis.requestRender(this.viewStart, this.viewStop);
     }
 
     renderHighlightEvent() {
@@ -400,7 +450,7 @@ class TimelineGL {
             data: this.highlightPolygons,
             getPolygon: d => d.polygon,
             filled: false,
-            getLineColor: [255, 255, 0], // yellow
+            getLineColor: d => d.color,
             getLineWidth: 2,
             lineWidthUnits: "pixels",
             coordinateOrigin: [ this.groupLabelHeight, 0, 0 ],
@@ -416,7 +466,8 @@ class TimelineGL {
             data: [[scaledStart, scaledStop]],
             getPolygon: e => this.getRangePolygon(e, 0, -y),
             lineWidthUnits: "pixels",
-            getLineColor: [255, 255, 0],
+            getLineWidth: 2,
+            getLineColor: [0, 0, 0],
             getFillColor: [255, 255, 0, 32],
         })
     }
@@ -454,8 +505,9 @@ class TimelineGL {
             this.groups.map(g => g.renderHistogram()),
             this.renderPreviewRange(),
             this.renderBackgroundGrid(),
-            this.bucketManager.renderBuckets(this.viewStart, this.viewStop),
+            this.rprofvis.renderBuckets(this.viewStart, this.viewStop),
             this.renderHighlightEvent(),
+            this.renderDispatch(),
             this.rangeSelectionLayer
         ];
         this.deckgl.setProps({layers});
@@ -600,8 +652,6 @@ class TimelineGL {
 
     gotoView(start, stop) {
         const {center, zoom} = this.computeViewFromRange(start, stop);
-        // this.currViewState.transitionDuration = 1000;
-        // this.currViewState.transitionInterpolator = new deck.LinearInterpolator({transitionProps: ['target', 'zoom']});
         this.syncView(center, zoom);
     }
 
@@ -609,12 +659,17 @@ class TimelineGL {
         if (!this.deckgl) return;
         let widgets = [];
         if (checked)
-            widgets = [new deck._FpsWidget({placement: 'top-right'})]
+            widgets = [new deck._StatsWidget({placement: 'top-right'})]
         this.deckgl.setProps({ widgets });
     }
 
     setMaxLoadedBuckets(value) {
-        this.bucketManager.setMaxLoadedBuckets(value);
+        this.rprofvis.setMaxLoadedBuckets(value);
+        this.requestRender();
+    }
+    
+    setEventLabelThreshold(value) {
+        this.rprofvis.setEventLabelThreshold(value);
         this.requestRender();
     }
 

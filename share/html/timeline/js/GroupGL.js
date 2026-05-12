@@ -90,6 +90,12 @@ class GroupGL {
         return dragHandle;
     }
 
+    updateGroupName(sameAboveParent = false) {
+        this.groupNameDOM.innerHTML = sameAboveParent
+            ? `&nbsp;&nbsp;└─ ${this.name[1]}`
+            : `${this.name[0]}<br>&nbsp;&nbsp;└─ ${this.name[1]}`;
+    }
+
     createGroupLabel() {
         const groupLabel = document.createElement('div');
         groupLabel.className = 'group-label';
@@ -97,7 +103,8 @@ class GroupGL {
 
         const text = document.createElement('div');
         text.className = 'group-label-text';
-        text.textContent = this.name ?? `Group ${this.id}`;
+        text.textContent = this.name;
+        this.groupNameDOM = text;
 
         groupLabel.appendChild(text);
 

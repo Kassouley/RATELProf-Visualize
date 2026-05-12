@@ -230,8 +230,8 @@ function createCSV(csvData, config) {
 
             if (header.includes('(ns)')) {
                 th.textContent = header.replace('(ns)', `(${timeunitSelect.value})`);
-            } else if (header.includes('(B)')) {
-                th.textContent = header.replace('(B)',  `(${sizeunitSelect.value})`);
+            } else if (header.includes('(KB)')) {
+                th.textContent = header.replace('(KB)',  `(${sizeunitSelect.value})`);
             } else {
                 th.textContent = header;
             }

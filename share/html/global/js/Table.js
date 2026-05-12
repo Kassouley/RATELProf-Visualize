@@ -91,6 +91,12 @@ class Table {
                 }
 
                 fragment.appendChild(document.createTextNode(displayContent));
+                
+                if (typeof onClick === "function") {
+                    const clickOnMe = document.createElement('div');
+                    clickOnMe.className = "click-on-me";
+                    fragment.appendChild(clickOnMe)
+                }
                 cell.appendChild(fragment);
             } else cell.textContent = displayContent;
 
