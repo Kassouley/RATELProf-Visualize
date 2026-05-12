@@ -38,9 +38,9 @@ class RProfVis {
             const event = this.getEvent(bucket, info.index, true);
             let correlated_events;
             if (click.srcEvent.ctrlKey) {
-                correlated_events = this.searchVisibleEventByCID(event.cid)
+                correlated_events = this.searchVisibleEventByID(event.cid)
             } else {
-                correlated_events = this.searchVisibleEventByID(event.id)
+                correlated_events = this.searchVisibleEventByCID(event.id)
             }
 
             onEventClick(event, correlated_events, info.index, bucket, click, this.groups[event.group_id]);
@@ -82,9 +82,9 @@ class RProfVis {
 
     searchVisibleEventByID(id) {
         for (const bucket of this.loadedBucket.values()) {
-            const jb = bucket.buffers.jb;
+            const ib = bucket.buffers.ib;
             for (let i = 0; i < bucket.count; i++) {
-                if (jb[i] == id) {
+                if (ib[i] == id) {
                     return [this.getEvent(bucket, i)];
                 };
             }
@@ -95,9 +95,9 @@ class RProfVis {
     searchVisibleEventByCID(cid) {
         const events = [];
         for (const bucket of this.loadedBucket.values()) {
-            const ib = bucket.buffers.ib;
+            const jb = bucket.buffers.jb;
             for (let i = 0; i < bucket.count; i++) {
-                if (ib[i] == cid) {
+                if (jb[i] == cid) {
                     events.push(this.getEvent(bucket, i))
                 };
             }
@@ -186,6 +186,7 @@ class RProfVis {
         const layers = [];
 
         for (const bucket of this.loadedBucket.values()) {
+            if (!bucket.ready) continue;
             bucket.visible = bucket.maxStop >= viewStart && bucket.minStart <= viewStop;
             layers.push(new deck.SolidPolygonLayer({
                 id: `bucket-${bucket.id}`,
@@ -231,7 +232,7 @@ class RProfVis {
         const events = [];
 
         for (const bucket of this.loadedBucket.values()) {
-            if (bucket.maxStop < viewStart || bucket.minStart > viewStop) continue;
+            if (!bucket.ready || bucket.maxStop < viewStart || bucket.minStart > viewStop) continue;
             const buffers = bucket.buffers;
             for (let i = 0; i < bucket.count; i++) {
                 const start = buffers.sb[i];
@@ -311,6 +312,7 @@ class RProfVis {
             off: this.offsets
         });
         window.worker.onmessage = (e) => {
+            bucket.ready = true;
             this.onBucketLoad(bucket, e.data)
         }
     }

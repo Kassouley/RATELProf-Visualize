@@ -318,7 +318,8 @@ class TimelineGL {
     getLineLayout() {
         const layout = [];
         for (const group of Object.values(this.groups)) {
-            for (const track of Object.values(group.tracks)) {
+            const tracks = Object.values(group.tracks);
+            for (const track of tracks.slice(1)) {
                 layout.push(track.off);
             }
         }
@@ -374,6 +375,12 @@ class TimelineGL {
     initializeGL() {
         this.createTimelineContainer();
 
+        const ignoredLids = new Set([
+            "__internal-preview-range",
+            "__internal-top-horizontal-line",
+            "__internal-bottom-horizontal-line"
+        ]);
+
         this.deckgl = new deck.DeckGL({
             container: this.deckContainer,
             useDevicePixels: false,
@@ -416,8 +423,10 @@ class TimelineGL {
             layerFilter: ({layer, viewport}) => {
                 const lid  = layer.id;
                 const vid  = viewport.id;
-                if (lid !== "__internal-preview-range"
-                    && vid.includes('histogram') && !lid.includes('histogram')) {
+                if (!ignoredLids.has(lid) &&
+                    vid.includes("histogram") &&
+                    !lid.includes("histogram")
+                ) {
                     return false;
                 }
                 return true;
@@ -474,6 +483,7 @@ class TimelineGL {
 
     renderBackgroundGrid() {
         const h = this.originalHeight;
+        const y = this.groupLabelHeight;
         return [
             new deck.LineLayer({
                 id: '__internal-vertical-grid',
@@ -481,21 +491,39 @@ class TimelineGL {
                 getSourcePosition: d => [d.x, 0],
                 getTargetPosition: d => [d.x, h],
                 getColor: this.gridColor,
-                coordinateOrigin: [ this.groupLabelHeight, 0, 0 ],
+                coordinateOrigin: [ y, 0, 0 ],
                 getWidth: 1
             }),
             new deck.LineLayer({
                 id: '__internal-horizontal-grid',
                 data: this.horizontalLineLayout,
-                getSourcePosition: y => [this.viewStart , y],
-                getTargetPosition: y => [this.viewStop , y],
+                getSourcePosition: y => [this.viewStart, y],
+                getTargetPosition: y => [this.viewStop, y],
                 getColor: this.gridColor,
                 getWidth: 1,
-                coordinateOrigin: [ this.groupLabelHeight, 0, 0 ],
+                coordinateOrigin: [ y, 0, 0 ],
                 updateTriggers: {
                     getSourcePosition: this.viewStart,
                     getTargetPosition: this.viewStop
                 }
+            }),
+            new deck.LineLayer({
+                id: '__internal-top-horizontal-line',
+                data: [{
+                    sourcePosition: [0 , -y],
+                    targetPosition: [1000 , -y]
+                }],
+                getColor: this.gridColor,
+                getWidth: 1,
+            }), 
+            new deck.LineLayer({
+                id: '__internal-bottom-horizontal-line',
+                data: [{
+                    sourcePosition: [0 , 0],
+                    targetPosition: [1000 , 0]
+                }],
+                getColor: this.gridColor,
+                getWidth: 1,
             })
         ]
     }
