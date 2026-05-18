@@ -1,4 +1,5 @@
 function loadConfig(configName, defaultConfig = {}, onUnload) {
+    configName = document.title + configName;
     let config = (() => {
         try {
             const stored = JSON.parse(localStorage.getItem(configName) || '{}');
