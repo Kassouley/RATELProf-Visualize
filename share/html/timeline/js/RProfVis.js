@@ -82,6 +82,8 @@ class RProfVis {
 
     searchVisibleEventByID(id) {
         for (const bucket of this.loadedBucket.values()) {
+            if (!bucket.ready) continue;
+
             const ib = bucket.buffers.ib;
             for (let i = 0; i < bucket.count; i++) {
                 if (ib[i] == id) {
@@ -95,6 +97,8 @@ class RProfVis {
     searchVisibleEventByCID(cid) {
         const events = [];
         for (const bucket of this.loadedBucket.values()) {
+            if (!bucket.ready) continue;
+
             const jb = bucket.buffers.jb;
             for (let i = 0; i < bucket.count; i++) {
                 if (jb[i] == cid) {
@@ -279,6 +283,7 @@ class RProfVis {
                 // Bucket is in the current view, cannot evict
                 return false;
             }
+            bucketToRemove.ready = false;
             console.log("Unload bucket " + bucketToRemove.id)
             this.loadedBucket.delete(bucketToRemove.id);
             this.loadedIndex.delete(indexToRemove);
