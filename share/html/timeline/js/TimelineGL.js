@@ -367,7 +367,7 @@ class TimelineGL {
         if (event.rightButton) {
             this.onDrag(info, event);
             const [start, stop] = this.rangeSelection[0];
-            console.log(this.rprofvis.getEventInRange(start, stop), 1000)
+            console.log(this.rprofvis.getEventInRange(start, stop))
         }
     }
 
