@@ -132,11 +132,6 @@ class TimelineGL {
                     this.gotoView(event.start, event.stop);
                 }
 
-                // Dispatch Event, show dispatch time
-                if (group.domain_mode == 1 || group.domain_mode == 3) {
-                    this.getDispatchData(event);
-                }
-                
                 // Highlight the polygons
                 this.highlightPolygons = [
                     { polygon: event.polygon, color: [255, 255, 0] },
@@ -151,8 +146,7 @@ class TimelineGL {
         })
     }
 
-    getDispatchData(event) {
-        const dispatch_time = event.metadata.args[1];
+    showDispatchPoint(event, dispatch_time) {
         const event_start = event.start;
         const y1 = event.polygon[1];
         const y2 = event.polygon[5];
@@ -161,6 +155,7 @@ class TimelineGL {
             position: [dispatch_time, event_y],
             length: event_start - dispatch_time
         }]
+        this.renderLayers();
     }
 
     renderDispatch() {

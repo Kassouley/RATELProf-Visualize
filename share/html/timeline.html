@@ -280,6 +280,16 @@
       return html;
     }
 
+    const memopMap = {
+        0: "__amd_rocclr_fillBufferAligned",
+        1: "__amd_rocclr_fillBufferAligned2D",
+        2: "__amd_rocclr_copyBuffer",
+        3: "__amd_rocclr_copyBufferAligned",
+        4: "__amd_rocclr_copyBufferRect",
+        5: "__amd_rocclr_copyBufferRectAligned",
+        6: "SDMA Transfer",
+    }
+
     function showTraceDetails(trace, group, track) {
         const traceInfo = document.getElementById("eventTab");
         traceInfo.innerHTML = "";
@@ -289,7 +299,7 @@
         const args = metadata.args;
         const lcol = [];
         const rcol = [];
-        
+        let dispatchTime;
         const append = (details, field, value) => details.push(`<tr><td>${escapeHTML(field)}:</td> <td>${escapeHTML(value)}</td></tr>`);
 
         append(lcol, "Name",       trace.name);
@@ -302,8 +312,9 @@
         append(rcol, track.label,              track.value);
 
         if (domain_mode == 1) {
-            const queue_time = trace.start - args[1]; 
-            append(lcol, "Dispatch Time",          formatTime(args[1]));
+            dispatchTime = args[1];
+            const queue_time = trace.start - dispatchTime; 
+            append(lcol, "Dispatch Time",          formatTime(dispatchTime));
             append(lcol, "Queue Duration",         formatTime(queue_time));
             append(rcol, "Block Dimension",        `[${args[2].join(", ")}]`);
             append(rcol, "Grid Dimension",         `[${args[3].join(", ")}]`);
@@ -314,12 +325,27 @@
             append(rcol, "Completion Signal",      formatAddr(args[0]));
 
         } else if (domain_mode == 0) {
-            append(rcol, "Size transferred",   formatBytes(args[1]));
-            append(rcol, "Other handle",       formatAddr(args[2]));
+            append(rcol, "Memory Operation",   memopMap[metadata.memop] || `Unknown (${metadata.memop})`);
+            if (metadata.memop != 6) {
+              dispatchTime = args.at(-2);
+              const queue_time = trace.start - dispatchTime; 
+              append(rcol, "Dispatch Time",  formatTime(dispatchTime));
+              append(lcol, "Queue Duration", formatTime(queue_time));
+              append(rcol, "Workgroup Size X", args.at(-1));
+            }
+            if (metadata.memop == 0 || metadata.memop == 1) {
+              append(rcol, "Size setted",   formatBytes(args[1]));
+            } else {
+              append(rcol, "Size transferred",   formatBytes(args[1]));
+              append(rcol, "Other handle",       formatAddr(args[2]));
+            }
             append(rcol, "Completion Signal",  formatAddr(args[0]));
 
         } else if (domain_mode == 3) {
-            append(lcol, "Dispatch Time",      formatTime(args[1]));
+            dispatchTime = args.at(-2);
+            const queue_time = trace.start - dispatchTime; 
+            append(rcol, "Dispatch Time",  formatTime(dispatchTime));
+            append(lcol, "Queue Duration", formatTime(queue_time));
             append(rcol, "Dependent Signals",  `[${args[2].map(e => formatAddr(e)).join(", ")}]`);
             append(rcol, "Completion Signal",  formatAddr(args[0]));
 
@@ -328,6 +354,10 @@
             rcol.push(`<tr><td>Function Arguments:</td> <td>${formatArgs(args, metadata.api_data.args)}</td></tr>`);
         }
         traceInfo.innerHTML = `<div class="two-column"><div class="scrollable"><table>${lcol.join("\n")}</table></div><div class="scrollable"><table>${rcol.join("\n")}</table></div></div>`;
+        
+        if (dispatchTime) {
+            timeline.showDispatchPoint(trace, dispatchTime);
+        }
     }
 
 

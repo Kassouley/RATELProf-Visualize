@@ -112,7 +112,9 @@ class RProfVis {
     decodeEventMetadata(metadata_str, domain_mode) {
         const msgpackDecoder = new MSGPackDecoder(atob(metadata_str));
         const metadata = {};
-        if (domain_mode == 1) {
+        if (domain_mode == 0) {
+            metadata.memop = msgpackDecoder.decode();
+        } if (domain_mode == 1) {
             const kernel_id = msgpackDecoder.decode();
             metadata.kernel_data = this.kernelTable[kernel_id];
         } else if (domain_mode == 2) {
@@ -379,16 +381,16 @@ class RProfVis {
             const group_label = msgpackDecoder.decode();
             const domain      = msgpackDecoder.decode();
             const domain_mode = msgpackDecoder.decode();
-            const track_label = msgpackDecoder.decode();
             const unit        = msgpackDecoder.decode();
             const ntracks     = msgpackDecoder.decode();
             const tracks = new Array(ntracks);
 
             for (let t = 0; t < ntracks; t++) {
-                const track_id  = msgpackDecoder.decode();
-                const subunit   = msgpackDecoder.decode();
-                const subtracks = msgpackDecoder.decode();
-                const height    = subtracks * this.trackHeight;
+                const track_id    = msgpackDecoder.decode();
+                const track_label = msgpackDecoder.decode();
+                const subunit     = msgpackDecoder.decode();
+                const subtracks   = msgpackDecoder.decode();
+                const height      = subtracks * this.trackHeight;
                 tracks[track_id] = { 
                     name: `${track_label} ${subunit}`,
                     label: track_label,
