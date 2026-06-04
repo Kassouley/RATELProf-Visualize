@@ -24,6 +24,7 @@ class RProfVis {
         this.maxTime = maxTime;
         this.onRequestSucceed = onRequestSucceed;
         this.eventLabelThreshold = eventLabelThreshold;
+        this.onEventClick = onEventClick;
 
         this.coordinateOrigin = [yOffset, 0, 0];
         
@@ -36,16 +37,21 @@ class RProfVis {
 
         this.handleClick = (bucket) => (info, click) => {
             const event = this.getEvent(bucket, info.index, true);
-            let correlated_events;
-            if (click.srcEvent.ctrlKey) {
-                correlated_events = this.searchVisibleEventByID(event.cid)
-            } else {
-                correlated_events = this.searchVisibleEventByCID(event.id)
-            }
-
-            onEventClick(event, correlated_events, info.index, bucket, click, this.groups[event.group_id]);
+            this.onEventSelect(event, click);
         }
         this.init();
+    }
+
+    onEventSelect(event, click = null) {
+        const callchainEvents = this.searchCallchainEvent(event);
+        let correlated_events;
+        if (click && click.srcEvent.ctrlKey) {
+            correlated_events = [callchainEvents.parents[0]];
+        } else {
+            correlated_events = callchainEvents.childs;
+        }
+
+        this.onEventClick(event, correlated_events, click, this.groups[event.group_id], callchainEvents);
     }
 
     getEvent(bucket, index, withMetadata = false) {
@@ -58,7 +64,10 @@ class RProfVis {
         const stop = start + dur;
         const group_id = buffers.gb[index];
         const track_id = buffers.tb[index];
-        const domain_mode = this.groups[group_id].domain_mode;
+        const group = this.groups[group_id];
+        const domain_mode = group.domain_mode;
+        const domain = group.domain;
+        const unit = group.name[0];
 
         const stride = 8;
         const offset = index * stride
@@ -70,6 +79,8 @@ class RProfVis {
             name: this.getString(buffers.fb[index]),
             id: buffers.ib[index],
             cid: buffers.jb[index],
+            domain, unit,
+            bucket,
             start, dur, stop, group_id, track_id, domain_mode, metadata_str, polygon, y
         }
 
@@ -80,21 +91,44 @@ class RProfVis {
         return event
     }
 
-    searchVisibleEventByID(id) {
+    searchCallchainEvent(event) {
+        const callchainEvents = {
+            childs: this.searchVisibleChildEvents(event),
+            self: event,
+            parents: []
+        };
+
+        const search = (currentEvent) => {
+            const parentEvent = this.searchVisibleParentEvent(currentEvent);
+            if (parentEvent) {
+                callchainEvents.parents.push(parentEvent);
+                search(parentEvent);
+            }
+        };
+
+        search(event);
+
+        return callchainEvents;
+    }
+
+    searchVisibleParentEvent(event) {
+        const id = event.cid;
         for (const bucket of this.loadedBucket.values()) {
             if (!bucket.ready) continue;
 
             const ib = bucket.buffers.ib;
             for (let i = 0; i < bucket.count; i++) {
                 if (ib[i] == id) {
-                    return [this.getEvent(bucket, i)];
+                    return this.getEvent(bucket, i, true);
                 };
             }
         }
+        return null;
     }
 
 
-    searchVisibleEventByCID(cid) {
+    searchVisibleChildEvents(event) {
+        const cid = event.id;
         const events = [];
         for (const bucket of this.loadedBucket.values()) {
             if (!bucket.ready) continue;
@@ -102,7 +136,7 @@ class RProfVis {
             const jb = bucket.buffers.jb;
             for (let i = 0; i < bucket.count; i++) {
                 if (jb[i] == cid) {
-                    events.push(this.getEvent(bucket, i))
+                    events.push(this.getEvent(bucket, i, true));
                 };
             }
         }
@@ -361,6 +395,7 @@ class RProfVis {
                 .map(([id, value]) => ({ id, ...value })) 
                 .sort((a, b) => a.minStart - b.minStart);
         this.maxTime = window.buckets.maxTime;
+        this.mainTime = window.buckets.mainTime;
         window.buckets = null;
     }
 

@@ -50,6 +50,17 @@
                 <label class="light">
                     <input type="radio" name="plt" value="histogram"> Histogram
                 </label>
+                <select id="notation">
+                    <option value="scientific" selected>Scientific</option>
+                    <option value="thousand_separator">Thousand Separator</option>
+                    <option value="plain">Plain</option>
+                </select>
+                <select id="timeunit">
+                    <option value="ns" selected>Nanoseconds (ns)</option>
+                    <option value="µs">Microseconds (µs)</option>
+                    <option value="ms">Milliseconds (ms)</option>
+                    <option value="s">Seconds (s)</option>
+                </select>
             </div>
             <div id="tableContainer" class="scrollable"></div>
         </div>
@@ -100,18 +111,65 @@ enableSplitView("dividerPanel", "divider", "horizontal", (newSize) => {
     plotPanel.style.height = newSize + "px";
 },)
 
+function formatNumber(value, notation) {
+    if (notation === 'scientific') {
+        return value.toExponential(3);
+    } else if (notation === 'thousand_separator') {
+        return value.toLocaleString('en-US');
+    }
+    return value;
+}
+
+const timeunitEl = document.getElementById("timeunit");
+const notationEl = document.getElementById("notation");
+const units = {'ns': 1, 'µs': 1e-3, 'ms': 1e-6, 's': 1e-9}
+
+function createDurationCell(duration) {
+    const el = document.createTextNode(duration)
+
+    function updateDuration() {
+        const unit = timeunitEl.value;
+        const notation = notationEl.value;
+        el.textContent = formatNumber(duration * units[unit], notation);
+    }
+
+    updateDuration();
+    timeunitEl.addEventListener("change", updateDuration);
+    notationEl.addEventListener("change", updateDuration);
+
+    return el;
+}
+
+function createDurationHeaderCell(cell) {
+    const el = document.createTextNode(cell)
+
+    function updateDuration() {
+        const unit = timeunitEl.value;
+        el.textContent = cell.replace('(ns)', `(${unit})`);
+    }
+
+    updateDuration();
+    timeunitEl.addEventListener("change", updateDuration);
+    return el;
+}
+
 function fillTable(tableId, data) {
     const container  = document.getElementById(tableId);
     const table = new Table(container, { subgroupPadding: 24 });
 
+    data[0][1] = createDurationHeaderCell(data[0][1]);
     table.addRow(data[0], { isHeader: true });
 
     for (let i = 1; i < data.length; i += 2) {
         const row = data[i];
         let subrows = data[i + 1];
 
+        row[1] = createDurationCell(row[1])
         table.addRow(row, { numberSubrow: subrows.length, collapsed: true });
-        subrows.forEach(sub => table.addRow(sub));
+        subrows.forEach(sub => {
+            sub[1] = createDurationCell(sub[1])
+            table.addRow(sub)
+        });
     }
 }
 

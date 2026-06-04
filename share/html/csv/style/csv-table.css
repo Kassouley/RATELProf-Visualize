@@ -1,24 +1,24 @@
-.csv-table {
+#csv-table {
     overflow: auto;
     width: 100%;
     min-height: 0;
 }
 
-.csv-table table {
+#csv-table table {
     width: 100%;
     table-layout: auto;
 }
 
-.csv-table th.sortable {
+#csv-table th.sortable {
     user-select: none;
 }
 
-.csv-table td,
-.csv-table th {
+#csv-table td,
+#csv-table th {
     white-space: nowrap;
 }
 
-.csv-table th.sortable::after {
+#csv-table th.sortable::after {
   padding-right:10px;
   content: "\00a0\00a0"; /* Reserve space for arrow */
   display: inline-block;
@@ -26,10 +26,10 @@
   text-align: center;
 }
 
-.csv-table th.asc::after {
+#csv-table th.asc::after {
   content: "\00a0▲";
 }
 
-.csv-table th.desc::after {
+#csv-table th.desc::after {
   content: "\00a0▼";
 }

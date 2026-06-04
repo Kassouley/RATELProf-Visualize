@@ -16,6 +16,7 @@ class TimelineGL {
                 getHistogramTooltip,
                 onEventClick,
                 onTimelineInit,
+                onRangeSelection,
                 initialView = [minTime, maxTime],
                 maxLoadedBuckets = 10,
                 eventLabelThreshold = 500,
@@ -39,6 +40,7 @@ class TimelineGL {
         this.eventLabelThreshold = eventLabelThreshold;
         this.viewPadding = viewPadding;
         this.onEventClick = onEventClick;
+        this.onRangeSelection = onRangeSelection;
         this.onTimelineInit = onTimelineInit;
         this.viewStart = this.initialView[0];
         this.viewStop  = this.initialView[1];
@@ -126,24 +128,33 @@ class TimelineGL {
                 this.renderLayers();
             },
 
-            onEventClick: (event, correlated_events, index, bucket, click, group) => {
+            onEventClick: (event, correlated_events, click, group, callchainEvents) => {
                 if (!event) return;
-                if (click.type === "dblclick") {
+                if (click && click.type === "dblclick") {
                     this.gotoView(event.start, event.stop);
                 }
 
                 // Highlight the polygons
                 this.highlightPolygons = [
                     { polygon: event.polygon, color: [255, 255, 0] },
-                    ...(correlated_events || []).map(e => ({
+                    ...(correlated_events || []).filter(e => e?.polygon).map(e => ({
                         polygon: e.polygon, color: [255, 0, 0]
                     }))
                 ];
                 this.renderLayers();
                 const track = group.tracks[event.track_id]
-                this.onEventClick(event, group, track)
+                this.onEventClick(event, group, track, callchainEvents)
             }
         })
+    }
+
+    selectEvent(event) {
+        this.rprofvis.onEventSelect(event);
+        this.gotoView(event.start, event.stop);
+    }
+
+    getMainTime() {
+        return this.rprofvis.mainTime || 0;
     }
 
     showDispatchPoint(event, dispatch_time) {
@@ -361,8 +372,14 @@ class TimelineGL {
         this.renderLayers();
         if (event.rightButton) {
             this.onDrag(info, event);
-            const [start, stop] = this.rangeSelection[0];
-            console.log(this.rprofvis.getEventInRange(start, stop))
+            let [start, stop] = this.rangeSelection[0];
+            if (start > stop) {
+                [start, stop] = [stop, start];
+            }
+            if (this.onRangeSelection) {
+                const events = this.rprofvis.getEventInRange(start, stop);
+                this.onRangeSelection(events, start, stop);
+            }
         }
     }
 
@@ -674,6 +691,9 @@ class TimelineGL {
     }
 
     gotoView(start, stop) {
+        const pad = (stop - start) * 0.1;
+        start -= pad;
+        stop += pad;
         const {center, zoom} = this.computeViewFromRange(start, stop);
         this.syncView(center, zoom);
     }

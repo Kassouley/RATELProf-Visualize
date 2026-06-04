@@ -1,11 +1,19 @@
 .csv-pagination {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: center;
     gap: 10px;
     padding: 10px;
     font-family: sans-serif;
     font-size: 12px;
+}
+
+.csv-pagination #pageRowInfo {
+    justify-self: start;
+}
+
+.csv-pagination #pageSelection {
+    justify-self: center;
 }
 
 .csv-pagination button {
@@ -38,27 +46,14 @@
     color: var(--text-color-dark);
 }
 
-#configPanel .hidden-toggle-buttons {
-    white-space: nowrap;
-    gap: 5px;
-    width: 100%;
-    overflow: auto;
-    display: flex;
-    scrollbar-width: thin;
-    margin-bottom: 10px;
-}
-
-#configPanel .selector  {
-    display: flex;
-    margin-bottom: 10px;
-    align-items: center;
-    width: 350px;
+#configPanel  label {
+    font-weight: 700;
+    color: var(--text-color-dark);
 }
 
 #configPanel .selector label {
-    flex: 1;
-    margin-right: 0.5em;
-    color: var(--text-color-dark);
+    gap: 5rem;
+    min-width: 100px;
     text-align: left;
 }
 
@@ -71,4 +66,71 @@
     cursor: pointer;
     font-size: 14px;
     transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: minmax(100px, 350px) minmax(100px, 1fr);
+    gap: 1rem;
+    align-items: stretch;
+}
+
+.left-panel,
+.right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+#columnToggleGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+}
+
+#columnToggleContainer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 0.5rem;
+    max-height: 100px;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+
+#columnToggleContainer label {
+    padding: 0.45em 0.7em;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: var(--secondary-bg, #f2f4f7);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    user-select: none;
+}
+
+#columnToggleContainer label:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.left-panel .selector {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#searchBar {
+    outline: none;
+    width: 100%;
+    height: 35px;
+    padding: 6px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
 }

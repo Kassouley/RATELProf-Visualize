@@ -20,6 +20,8 @@
 
 <script src="csv/js/textRendering.js"></script>
 <script src="csv/js/csv.js"></script>
+<script src="csv/js/CSVTable.js"></script>
+<script src="csv/js/CSVTableWrapper.js"></script>
 
 <script src="data/misc.js"></script>
 
@@ -86,53 +88,58 @@
                     &#9881;
                 </button>
             </div>
+            <div id="configPanel" style="display:none">
+                <div class="config-grid">
+                    <div class="left-panel">
+                        <div class="selector">
+                            <label for="timeunit">Time Unit:</label>
+                            <select id="timeunit">
+                                <option value="ns" selected>Nanoseconds (ns)</option>
+                                <option value="µs">Microseconds (µs)</option>
+                                <option value="ms">Milliseconds (ms)</option>
+                                <option value="s">Seconds (s)</option>
+                            </select>
+                        </div>
 
-            <div id="configPanel" style="display: none;">
-                Hide columns:
-                <div class="hidden-toggle-buttons"></div>
+                        <div class="selector">
+                            <label for="sizeunit">Size Unit:</label>
+                            <select id="sizeunit">
+                                <option value="B" selected>Bytes (B)</option>
+                                <option value="KB">Kilobytes (KB)</option>
+                                <option value="MB">Megabytes (MB)</option>
+                                <option value="GB">Gigabytes (GB)</option>
+                            </select>
+                        </div>
 
-                <div class="selector">
-                    <label for="timeunit">Time Unit:</label>
-                    <select id="timeunit">
-                        <option>ns</option>
-                        <option>us</option>
-                        <option>ms</option>
-                        <option>s</option>
-                    </select>
-                </div>
-
-                <div class="selector">
-                    <label for="sizeunit">Size Unit:</label>
-                    <select id="sizeunit">
-                        <option>B</option>
-                        <option selected>KB</option>
-                        <option>MB</option>
-                        <option>GB</option>
-                    </select>
-                </div>
-
-                <div class="selector">
-                    <label for="notation">Notation:</label>
-                    <select id="notation">
-                        <option>Scientific</option>
-                        <option>Thousand Separator</option>
-                    </select>
+                        <div class="selector">
+                            <label for="notation">Notation:</label>
+                            <select id="notation">
+                                <option value="scientific" selected>Scientific</option>
+                                <option value="thousand_separator">Thousand Separator</option>
+                                <option value="plain">Plain</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="right-panel">
+                        <div class="control-group" id="columnToggleGroup">
+                            <label>Columns:</label>
+                            <div id="columnToggleContainer"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="csv-table">
-                <table>
-                    <thead><tr id="headerRow"></tr></thead>
-                    <tbody id="dataRows"></tbody>
-                </table>
-            </div>
+            <div id="csv-table"></div>
 
             <div class="csv-pagination" role="navigation">
+                <div id="pageRowInfo"></div>
+                <div id="pageSelection">
                 <button id="prevPage" class="light">◀</button>
                 <label for="pageSelect">Page</label>
                 <select id="pageSelect"></select>
                 <span   id="pageInfo"></span>
                 <button id="nextPage" class="light">▶</button>
+                </div>
             </div>
         </div>
     </div>
@@ -145,70 +152,6 @@ enableSplitView("contentPanel", "divider", "horizontal", (newSize) => {
     topPanel.style.height = newSize + "px";
 })
 </script>
-
-<script>
-const notationSelect = document.getElementById("notation");
-const timeunitSelect = document.getElementById("timeunit");
-const sizeunitSelect = document.getElementById("sizeunit");
-const searchBar      = document.getElementById("searchBar");
-
-const prevBtn = document.getElementById("prevPage");
-const nextBtn = document.getElementById("nextPage");
-const pageSelect = document.getElementById("pageSelect");
-const pageInfo = document.getElementById("pageInfo");
-
-let currentPage = null;
-let totalPages = null;
-let loadPage = null;
-
-function initPagination(total, initPage, onPageLoad) {
-    totalPages = total;
-    currentPage = initPage;
-    loadPage = onPageLoad;
-
-    pageSelect.innerHTML = "";
-
-    for (let i = 1; i <= totalPages; i++) {
-        const option = document.createElement("option");
-        option.value = i;
-        option.textContent = `${i}`;
-        pageSelect.appendChild(option);
-    }
-
-    updatePagination();
-}
-
-function updatePagination() {
-    pageSelect.value = currentPage;
-    pageInfo.textContent = `of ${totalPages}`;
-
-    prevBtn.disabled = currentPage === 1;
-    nextBtn.disabled = currentPage === totalPages;
-}
-
-prevBtn.addEventListener("click", () => {
-    if (currentPage > 1) {
-        currentPage--;
-        updatePagination();
-        loadPage(currentPage);
-    }
-});
-
-nextBtn.addEventListener("click", () => {
-    if (currentPage < totalPages) {
-        currentPage++;
-        updatePagination();
-        loadPage(currentPage);
-    }
-});
-
-pageSelect.addEventListener("change", () => {
-    currentPage = Number(pageSelect.value);
-    updatePagination();
-    loadPage(currentPage);
-});
-</script>
-
 
 </body>
 </html>

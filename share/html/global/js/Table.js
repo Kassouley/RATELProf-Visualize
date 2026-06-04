@@ -1,12 +1,25 @@
 class Table {
     constructor(container, {
-        id, subgroupPadding = 36, max_len = 64
+        id, subgroupPadding = 36, max_len = 64, 
+        subgroupPaddingOnlyFirstCol = false, subgroupTreeview = false
     } = {}) {
         this.subgroupPadding = subgroupPadding;
-        this.groupCounter = 1;
+        this.subgroupPaddingOnlyFirstCol = subgroupPaddingOnlyFirstCol;
+        this.subgroupTreeview = subgroupTreeview;
+
+        this.groupCounter = 0;
         this.pendingGroup = [];
+        this.newGroup(Infinity);
         this.max_len = max_len;
 
+        if (typeof container === "string") {
+            this.container = document.getElementById(container);
+        } else if (container instanceof HTMLElement) {
+            this.container = container;
+        } else {
+            throw new Error("Container must be an HTMLElement or an element ID");
+        }
+        this.container.innerHTML = '';
 
         this.table = document.createElement("table");
 
@@ -16,7 +29,14 @@ class Table {
         this.tbody = document.createElement("tbody");
         this.table.appendChild(this.thead);
         this.table.appendChild(this.tbody);
-        container.appendChild(this.table);
+        this.container.appendChild(this.table);
+    }
+
+    newGroup(count, collapsed = false) {
+        const groupId = this.groupCounter++;
+        const group = { count, groupId, collapsed, depth: this.pendingGroup.length }
+        this.pendingGroup.push(group);
+        return group;
     }
 
     addRow(cells, props = {}) {
@@ -32,24 +52,32 @@ class Table {
         tr.style.backgroundColor = ""
         let groupId = null;
         let depth = 0;
+        let current = null
 
         // Handle subrow for pending group
-        if (!isHeader && this.pendingGroup.length) {
-            const current = this.pendingGroup.at(-1);
+        if (!isHeader) {
+            current = this.pendingGroup.at(-1);
+
+            if (current && (current.count--) <= 0) {
+                do {
+                    this.pendingGroup.pop();
+                    current = this.pendingGroup.at(-1);
+                } while (current && current.count <= 0);
+            }
+
             groupId = current.groupId;
             depth = current.depth;
+
             tr.classList.add(`group-${groupId}`);
             tr.style.display = current.collapsed ? "none" : "table-row";
-
-            if (--current.count <= 0) this.pendingGroup.pop();
         }
 
         // Handle new group
         if (!isHeader && numberSubrow > 0) {
-            groupId = this.groupCounter++;
+            const newGroup = this.newGroup(numberSubrow, collapsed);
+            groupId = newGroup.groupId;
             tr.dataset.group = groupId;
             if (!collapsed) tr.classList.add("expanded");
-            this.pendingGroup.push({ count: numberSubrow, groupId, collapsed, depth: this.pendingGroup.length + 1 });
         }
 
         // Click handler
@@ -64,11 +92,19 @@ class Table {
         cells.forEach((content, idx) => {
             const cell = isHeader ? document.createElement("th") : document.createElement("td");
             cell.colSpan = colspan[idx] || 1;
-            cell.style.paddingLeft = `${5 + this.subgroupPadding * depth}px`;
+            if (this.subgroupPaddingOnlyFirstCol) {
+                if (idx === 0) cell.style.paddingLeft = `${5 + this.subgroupPadding * depth}px`;
+            } else {
+                cell.style.paddingLeft = `${5 + this.subgroupPadding * depth}px`;
+            }
+
+            const isElement = content instanceof Node;
+            const isString = typeof content === "string";
 
             let displayContent = content;
-            if (content.length > this.max_len) {
-                displayContent = content.slice(0, this.max_len) + '...';
+
+            if (isString && content.length > this.max_len) {
+                displayContent = content.slice(0, this.max_len) + "...";
                 cell.title = content; // Full content shown on hover
             }
 
@@ -90,15 +126,36 @@ class Table {
                     fragment.append(tooltipSpan, document.createTextNode(" "));
                 }
 
-                fragment.appendChild(document.createTextNode(displayContent));
-                
+                if (this.subgroupTreeview && !isHeader) {
+                    const treeSymbol = document.createTextNode("└─ ");
+                    if (current.prevTreeSymbol) {
+                        current.prevTreeSymbol.textContent = "├─ ";
+                    }
+                    current.prevTreeSymbol = treeSymbol;
+                    fragment.appendChild(treeSymbol);
+                }
+
+                if (isElement) {
+                    fragment.appendChild(content);
+                } else {
+                    fragment.appendChild(
+                        document.createTextNode(displayContent)
+                    );
+                }
+
                 if (typeof onClick === "function") {
                     const clickOnMe = document.createElement('div');
                     clickOnMe.className = "click-on-me";
                     fragment.appendChild(clickOnMe)
                 }
                 cell.appendChild(fragment);
-            } else cell.textContent = displayContent;
+            } else {
+                if (isElement) {
+                    cell.appendChild(content);
+                } else {
+                    cell.textContent = displayContent;
+                }
+            }
 
             tr.appendChild(cell);
         });
@@ -107,6 +164,8 @@ class Table {
         else this.tbody.appendChild(tr);
 
         if (!isHeader) this.__applyAlternateColors();
+
+        return tr;
     }
 
     forEachRow(callback) {

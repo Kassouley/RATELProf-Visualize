@@ -3,7 +3,7 @@
   overflow: auto;
   min-height: 0;
   height: 100%;
-  padding:15px;
+  margin:15px;
 }
 
 
@@ -24,16 +24,53 @@
   color:#444;
 }
 
-.setting-item{
-  margin-bottom:15px;
-  padding:8px;
-  cursor:help;
-  border-radius:4px;
+.setting-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  cursor: help;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: var(--secondary-bg);
+}
+
+.setting-item,
+.setting-item * {
+  cursor: help;
 }
 
 .setting-item:hover{
-  background:#f5f5f5;
+  background: var(--hover-color);
+  border-color: var(--border-color);
 }
+
+.setting-item label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  font-size: 0.95rem;
+  color: var(--text-color-dark);
+}
+
+.setting-item input[type="number"],
+.setting-item select {
+  min-width: 130px;
+  max-width: 250px;
+  width: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
 
 /* INPUT SELECT TAB */
 #fileSelector {
@@ -129,4 +166,9 @@
 
 .value {
     color: #b5651d;
+}
+
+#statsTab {
+  display:flex;
+  flex-direction:column;
 }

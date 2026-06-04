@@ -43,13 +43,18 @@ class SelectInput {
     }
 
     addOption(option) {
-        this.options.push(option);
+        const idx = this.options.push(option) - 1;
 
-        if (this.defaultselect !== null 
-                && this.options.length - 1 === this.defaultselect) {
-            this.input.value = option.name;
-            if (this.onSelect) this.onSelect(option, this.defaultselect);
+        const shouldSelect = this.defaultselect == null || option.name === this.defaultselect;
+
+        if (!shouldSelect) return;
+
+        if (this.defaultselect == null) {
+            this.defaultselect = idx;
         }
+
+        this.input.value = option.name;
+        this.onSelect?.(option, this.defaultselect);
     }
 
     triggerSelect() {

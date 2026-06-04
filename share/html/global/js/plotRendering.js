@@ -96,6 +96,7 @@ function renderHistogram(container, data) {
         type: "bar",
         data,
         options: {
+            maxBarThickness: 50,
             responsive: true,
             maintainAspectRatio: false,
             scales: {

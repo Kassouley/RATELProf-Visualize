@@ -10,11 +10,16 @@
 
 <link rel="stylesheet" href="timeline/style/timeline-gl.css">
 <link rel="stylesheet" href="timeline/style/tabs.css">
+<link rel="stylesheet" href="timeline/style/duration_bar.css">
+
+<link rel="stylesheet" href="csv/style/csv-table.css">
+<link rel="stylesheet" href="csv/style/csv-misc.css">
 
 <script src="https://cdn.jsdelivr.net/npm/deck.gl@9.3.2/dist.min.js"></script>
 
 <script src="global/js/localStorage.js"></script>
 <script src="global/js/splitView.js"></script>
+<script src="global/js/Table.js"></script>
 
 <script src="timeline/js/MSGPackDecoder.js"></script>
 <script src="timeline/js/RProfVis.js"></script>
@@ -27,17 +32,40 @@
 <script src="timeline/js/TimeInput.js"></script>
 <script src="timeline/js/SelectInput.js"></script>
 
+<script src="csv/js/CSVTable.js"></script>
+<script src="csv/js/CSVTableWrapper.js"></script>
+
+<script src="timeline/js/EventStatistics.js"></script>
+
 <script src="data/misc.js"></script>
 <script src="data/timeline.js"></script>
 <script>
     const CONFIG = loadConfig("timelineConfig", {
-      rankIdx: 0,
+      rankId: null,
       initialView: [0, 1_000_000],
       maxLoadedBuckets: 20,
       eventLabelThreshold: 500,
     }, (config) => {
       config.initialView = timeline.getView();
     });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const rankParamRaw  = urlParams.get('rank');
+    const startParamRaw = urlParams.get('start');
+    const stopParamRaw  = urlParams.get('stop');
+
+    const rankParam = rankParamRaw !== null ? Number(rankParamRaw) : NaN;
+    const startParam = startParamRaw !== null ? Number(startParamRaw) : NaN;
+    const stopParam = stopParamRaw !== null ? Number(stopParamRaw) : NaN;
+
+    if (Number.isFinite(rankParam)) {
+      CONFIG.rankId = rankParam;
+    }
+
+    if (Number.isFinite(startParam) && Number.isFinite(stopParam) 
+          && stopParam >= startParam) {
+      CONFIG.initialView = [startParam, stopParam];
+    }
 </script>
 </head>
 
@@ -65,6 +93,8 @@
       <div class="tabs">
         <button onclick="changeTab(this, 'settings')">⚙</button>
         <button onclick="changeTab(this, 'eventTab')" class="active">Event</button>
+        <button onclick="changeTab(this, 'statsTab')">Statistics</button>
+        <button onclick="changeTab(this, 'callchainTab')">Callchain</button>
 
         <div id="fileSelector"></div>
         <div id="gotoDiv">
@@ -75,16 +105,55 @@
 
       <div class="tab-content" id="eventTab">Click on an event to see more details.</div>
 
+      <div class="tab-content" id="statsTab">
+        <input id="searchBar" placeholder="Search..." />
+        <div id="csv-table"> Select a range to view statistics.</div>
+        <div class="csv-pagination" role="navigation">
+            <div id="pageRowInfo"></div>
+            <div id="pageSelection">
+            <button id="prevPage" class="light">◀</button>
+            <label for="pageSelect">Page</label>
+            <select id="pageSelect"></select>
+            <span   id="pageInfo"></span>
+            <button id="nextPage" class="light">▶</button>
+            </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="callchainTab">
+        <div id="callchainInfo">Click on an event to see its callchain.</div>
+      </div>
+
       <div class="tab-content" id="settings">
         <div class="settings-left">
           <div class="setting-item" data-desc="Displays the current frames per second on screen.">
-            <label> <input type="checkbox" id="toggleFPS"> Show FPS </label>
+            <label for="toggleFPS"> Show FPS:</label>
+            <input type="checkbox" id="toggleFPS">
           </div>
           <div class="setting-item" data-desc="Maximum number of buckets that can be loaded simultaneously. Higher values increase memory usage but may improve loading speed.">
-            <label> Max Buckets Loaded <input type="number" id="maxBuckets" min="1" max="1000"> </label>
+            <label for="maxBuckets"> Max Buckets Loaded:</label>
+            <input type="number" id="maxBuckets" min="1" max="1000">
           </div>
           <div class="setting-item" data-desc="If the number of event visible on the screen is greater than this threshold, then no label will be shown in event box.">
-            <label> Event Label Threshold <input type="number" id="eventLabelThreshold" min="1" max="100000"> </label>
+            <label for="eventLabelThreshold"> Event Label Threshold:</label>
+            <input type="number" id="eventLabelThreshold" min="1" max="100000">
+          </div>
+          <div class="setting-item" data-desc="Notation system used for statistics display.">
+            <label for="notation">Notation:</label>
+            <select id="notation">
+                <option value="scientific">Scientific</option>
+                <option value="thousand_separator">Thousand Separator</option>
+                <option value="plain">Plain</option>
+            </select>
+          </div>
+          <div class="setting-item" data-desc="Time unit system used for statistics display.">
+            <label for="timeunit">Time Unit:</label>
+            <select id="timeunit">
+                <option value="ns">Nanoseconds (ns)</option>
+                <option value="µs">Microseconds (µs)</option>
+                <option value="ms">Milliseconds (ms)</option>
+                <option value="s">Seconds (s)</option>
+            </select>
           </div>
         </div>
 
@@ -165,7 +234,29 @@
             .map(([name, { ratio }]) => `${(ratio * 100).toFixed(2)}% : <b>${name}</b>`)
             .join('<br>');
         },
-        onEventClick: showTraceDetails,
+        onEventClick: onEventClick,
+        onRangeSelection: (events, start, stop) => {
+          changeTab(document.querySelector(".tabs button:nth-child(3)"), "statsTab");
+
+          const stats = new EventStatistics(events, start, stop);
+          const result = stats.compute();
+
+          new CSVTableWrapper(result, {
+              rowPerPage: 10,
+          }, {
+              tableContainer: "csv-table",
+              notationSelect: "notation",
+              timeunitSelect: "timeunit",
+              searchBar:  "searchBar",
+              prevBtn: "prevPage",
+              nextBtn: "nextPage",
+              pageSelect: "pageSelect",
+              pageInfo: "pageInfo",
+              pageRowInfo : "pageRowInfo"
+          });
+
+
+        },
         onTimelineInit: (timeline) => {
             console.log("Timeline initialized");
         }, 
@@ -216,15 +307,16 @@
       timeline.setEventLabelThreshold(e.target.value);
     });
 
-    const selectInput = new SelectInput("fileSelector", CONFIG.rankIdx, (option, index) => {
-      CONFIG.rankIdx = index;
+    const selectInput = new SelectInput("fileSelector", CONFIG.rankId ? "RANK "+CONFIG.rankId : null, (option, _) => {
+      CONFIG.rankId = option.rankId;
       timeline.loadReport(option.value) 
     });
 
     __TIMELINE_DATA__.FILENAMES.forEach(e => {
       const option = {
-        name: e.replace(".rprof-vis", "").replace(/_/g, ' ').toUpperCase(),
-        value: `data/traces/${e}`
+        rankId: e.rank,
+        name: e.basename.replace(/_/g, ' ').toUpperCase(),
+        value: `data/traces/${e.basename}`
       }
       selectInput.addOption(option)
     });
@@ -288,6 +380,92 @@
         4: "__amd_rocclr_copyBufferRect",
         5: "__amd_rocclr_copyBufferRectAligned",
         6: "SDMA Transfer",
+    }
+
+    function onEventClick(event, group, track, callchainEvents) {
+      showTraceDetails(event, group, track);
+      showCallchainDetails(callchainEvents);
+    }
+
+
+    function formatNumber(value, notation) {
+        if (notation === 'scientific') {
+            return value.toExponential(3);
+        } else if (notation === 'thousand_separator') {
+            return value.toLocaleString('en-US');
+        }
+        return value;
+    }
+
+    function createDurationBar(duration, maxTime) {
+      const units = {'ns': 1, 'µs': 1e-3, 'ms': 1e-6, 's': 1e-9}
+      const timeunitEl = document.getElementById("timeunit");
+      const notationEl = document.getElementById("notation");
+      const el = document.createElement("div");
+      const isMissing = duration == null;
+      const pct = isMissing
+          ? 100
+          : Math.max(1, duration / maxTime * 100);
+
+      el.className = "trace-time";
+      el.innerHTML = `
+          <div class="trace-bar">
+              <div class="${isMissing ? "trace-bar-missing" : "trace-bar-fill"}" style="width:${pct}%"></div>
+          </div>
+          <span class="trace-duration"></span>`;
+
+
+      const durationSpan = el.querySelector(".trace-duration");
+
+      function updateDuration() {
+        const unit = timeunitEl.value;
+        const notation = notationEl.value;
+        durationSpan.textContent = isMissing ? "Not Profiled" : formatNumber(duration * units[unit], notation) + " " + unit;
+      }
+
+      updateDuration();
+      timeunitEl.addEventListener("change", updateDuration);
+      notationEl.addEventListener("change", updateDuration);
+
+      return el;
+    }
+
+
+    function showCallchainDetails(callchainEvents) {
+        const table = new Table("callchainInfo", { 
+          subgroupPadding: 20, 
+          subgroupPaddingOnlyFirstCol: true,
+          subgroupTreeview: true
+        });
+        table.addRow(["Callchain", "Duration"], {isHeader: true});
+
+        const parents = callchainEvents.parents.reverse();
+        const event = callchainEvents.self;
+        const childs = callchainEvents.childs;
+        const mainTime = timeline.getMainTime();
+        let maxTime = null;
+
+        let oldParent = null;
+        function addRow(e, nchild = 1) {
+          if (maxTime === null) {
+            maxTime = e.dur;
+          }
+          const callerFunction = e.metadata.location?.function;
+          if (callerFunction) {
+            if (callerFunction === "main") {
+              table.addRow([callerFunction, createDurationBar(mainTime, maxTime)], { numberSubrow: 1 });
+            } else if (callerFunction !== oldParent) {
+              table.addRow(["Missing Call(s)", createDurationBar(null, maxTime)], { numberSubrow: 1 });
+              table.addRow([callerFunction, createDurationBar(null, maxTime)], { numberSubrow: 1 });
+            }
+            oldParent = e.name;
+          }
+          table.addRow([e.name, createDurationBar(e.dur, maxTime)], { numberSubrow: nchild, onClick: () => timeline.selectEvent(e) });
+        }
+
+        parents.forEach(e => { addRow(e) });
+        addRow(event, childs.length);
+        childs.forEach(e => { addRow(e, 0) });
     }
 
     function showTraceDetails(trace, group, track) {
@@ -359,8 +537,6 @@
             timeline.showDispatchPoint(trace, dispatchTime);
         }
     }
-
-
 
 </script>
 </html>
