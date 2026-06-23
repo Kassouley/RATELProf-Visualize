@@ -324,7 +324,7 @@ class TimelineGL {
     getLineLayout() {
         const layout = [];
         for (const group of Object.values(this.groups)) {
-            const tracks = Object.values(group.tracks);
+            const tracks = Object.values(group.tracks).sort((a, b) => a.off - b.off);
             for (const track of tracks.slice(1)) {
                 layout.push(track.off);
             }

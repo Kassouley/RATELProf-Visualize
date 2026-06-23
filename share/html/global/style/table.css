@@ -27,8 +27,16 @@ tr:hover {
     background-color: var(--hover-color) !important;
 }
 
-tr:nth-child(odd) {
+tr:nth-child(odd of :not([hidden])) {
   background-color: var(--tbl-row-odd-color);
+}
+
+tr:nth-child(even of :not([hidden])) {
+  background-color: var(--tbl-row-even-color);
+}
+
+tr[hidden] {
+  visibility: collapse;
 }
 
 td {
@@ -37,13 +45,6 @@ td {
     word-break: break-word;
     overflow: auto;
     scrollbar-width: thin;
-}
-
-tr.even {
-  background-color: var(--tbl-row-even-color);
-}
-tr.odd {
-  background-color: var(--tbl-row-odd-color);
 }
 
 .scrollable {

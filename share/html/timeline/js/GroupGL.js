@@ -38,7 +38,7 @@ class GroupGL {
     createTrackLabels() {
         const trackLabels = document.createElement('div');
 
-        this.tracks.forEach(track => {
+        this.tracks.slice().sort((a, b) => a.off - b.off).forEach(track => {
             const label = document.createElement('div');
             label.className = 'track-label';
             label.textContent = track.name;

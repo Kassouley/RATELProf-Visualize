@@ -34,7 +34,12 @@ class Table {
 
     newGroup(count, collapsed = false) {
         const groupId = this.groupCounter++;
-        const group = { count, groupId, collapsed, depth: this.pendingGroup.length }
+        const group = { 
+            count, 
+            groupId, 
+            collapsed, 
+            depth: this.pendingGroup.length,
+        }
         this.pendingGroup.push(group);
         return group;
     }
@@ -69,7 +74,7 @@ class Table {
             depth = current.depth;
 
             tr.classList.add(`group-${groupId}`);
-            tr.style.display = current.collapsed ? "none" : "table-row";
+            tr.hidden = current.collapsed;
         }
 
         // Handle new group
@@ -163,8 +168,6 @@ class Table {
         if (isHeader) this.thead.appendChild(tr);
         else this.tbody.appendChild(tr);
 
-        if (!isHeader) this.__applyAlternateColors();
-
         return tr;
     }
 
@@ -190,13 +193,19 @@ class Table {
         });
     }
 
-    __applyAlternateColors() {
-        Array.from(this.tbody.rows)
-            .filter(r => r.style.display !== "none")
-            .forEach((r, i) => {
-                r.classList.remove("even", "odd");
-                r.classList.add(i % 2 === 0 ? "even" : "odd");
-            });
+
+    __toggleGroup(groupId, show) {
+        const rows = this.tbody.querySelectorAll(`.group-${groupId}`);
+
+        rows.forEach(row => {
+            row.hidden = !show
+
+            const childGroupId = row.dataset.group;
+
+            if (childGroupId) {
+                this.__toggleGroup(childGroupId, show);
+            }
+        });
     }
 
     __getCollapseArrow(tr, collapsed, groupId) {
@@ -214,14 +223,9 @@ class Table {
             e.stopPropagation();
 
             arrow.classList.toggle("collapsed");
-            tr.classList.toggle("expanded");
 
-            const groupRows = this.tbody.querySelectorAll(`.group-${groupId}`);
             const shouldShow = !arrow.classList.contains("collapsed");
-
-            groupRows.forEach(r => r.style.display = shouldShow ? "table-row" : "none");
-
-            this.__applyAlternateColors();
+            this.__toggleGroup(groupId, shouldShow);
         });
 
         return arrow;
