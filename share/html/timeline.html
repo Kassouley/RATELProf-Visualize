@@ -307,7 +307,7 @@
       timeline.setEventLabelThreshold(e.target.value);
     });
 
-    const selectInput = new SelectInput("fileSelector", CONFIG.rankId ? "RANK "+CONFIG.rankId : null, (option, _) => {
+    const selectInput = new SelectInput("fileSelector", Number.isFinite(CONFIG.rankId) ? "RANK "+CONFIG.rankId : null, (option, _) => {
       CONFIG.rankId = option.rankId;
       timeline.loadReport(option.value) 
     });
