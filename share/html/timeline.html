@@ -527,9 +527,12 @@
             append(rcol, "Dependent Signals",  `[${args[2].map(e => formatAddr(e)).join(", ")}]`);
             append(rcol, "Completion Signal",  formatAddr(args[0]));
 
-        } else {
+        } else if (domain_mode == 2) {
             append(rcol, "Source", formatLocation(metadata.location));
             rcol.push(`<tr><td>Function Arguments:</td> <td>${formatArgs(args, metadata.api_data.args)}</td></tr>`);
+        } else if (domain_mode == 4) {
+            append(rcol, "Source", formatLocation(metadata.location));
+            append(lcol, "Type", "Marker");
         }
         traceInfo.innerHTML = `<div class="two-column"><div class="scrollable"><table>${lcol.join("\n")}</table></div><div class="scrollable"><table>${rcol.join("\n")}</table></div></div>`;
         

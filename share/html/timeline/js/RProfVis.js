@@ -156,6 +156,9 @@ class RProfVis {
             const loc_id = msgpackDecoder.decode();
             metadata.api_data = this.apiTable[api_id];
             metadata.location = this.locationTable[loc_id];
+        } else if (domain_mode == 4) {
+            const loc_id = msgpackDecoder.decode();
+            metadata.location = this.locationTable[loc_id];
         }
      
         const nargs = msgpackDecoder.decode();
